@@ -1,0 +1,396 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  background: #f5f6f8;
+  color: #222;
+  margin: 0;
+  padding: 16px;
+}
+
+.wrapper {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 26px;
+  margin: 0 0 14px 0;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.tab {
+  border: 1px solid #d0d0d0;
+  background: #ffffff;
+  padding: 8px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.tab.active {
+  background: #2d6cdf;
+  color: white;
+  border-color: #2d6cdf;
+}
+
+.section {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 10px;
+  border: 1px solid #ddd;
+}
+
+.hidden {
+  display: none;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+th {
+  text-align: center;
+  font-size: 14px;
+  color: #666;
+  padding: 6px 6px;
+  border-bottom: 1px solid #ddd;
+}
+
+td {
+  padding: 8px 6px;
+  border-bottom: 1px solid #eee;
+  font-size: 16px;
+  text-align: center;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+td:nth-child(1), th:nth-child(1) {
+  width: 70px;
+}
+
+td:nth-child(2), th:nth-child(2) {
+  width: 70px;
+}
+
+td:nth-child(3), th:nth-child(3) {
+  width: 80px;
+  color: #444;
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<h1>Horarios de transporte</h1>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTable('ida_lv', this)">El Puerto → Cádiz · Labor</button>
+<button class="tab" onclick="showTable('ida_sdf', this)">El Puerto → Cádiz · Finde</button>
+<button class="tab" onclick="showTable('v_lv', this)">Cádiz → El Puerto · Labor</button>
+<button class="tab" onclick="showTable('v_sdf', this)">Cádiz → El Puerto · Finde</button>
+</div>
+
+<div id="ida_lv" class="section visible">
+  <table>
+    <tr><th>Salida</th><th>Llegada</th><th>Línea</th></tr>
+    <tr><td>06:28</td><td>07:07</td><td>C-1</td></tr>
+<tr><td>06:45</td><td>07:16</td><td>M-961</td></tr>
+<tr><td>06:58</td><td>07:37</td><td>C-1</td></tr>
+<tr><td>07:00</td><td>07:40</td><td>M-060</td></tr>
+<tr><td>07:10</td><td>07:40</td><td>B-042</td></tr>
+<tr><td>07:20</td><td>08:06</td><td>M-040</td></tr>
+<tr><td>07:40</td><td>08:35</td><td>M-041</td></tr>
+<tr><td>07:44</td><td>08:23</td><td>C-1</td></tr>
+<tr><td>07:45</td><td>08:31</td><td>M-967</td></tr>
+<tr><td>07:56</td><td>08:26</td><td>MD</td></tr>
+<tr><td>08:00</td><td>08:51</td><td>M-041</td></tr>
+<tr><td>08:13</td><td>08:52</td><td>C-1</td></tr>
+<tr><td>08:40</td><td>09:10</td><td>B-042</td></tr>
+<tr><td>08:40</td><td>09:19</td><td>C-1</td></tr>
+<tr><td>08:42</td><td>09:35</td><td>M-960</td></tr>
+<tr><td>08:45</td><td>09:30</td><td>M-061</td></tr>
+<tr><td>08:55</td><td>09:27</td><td>MD</td></tr>
+<tr><td>09:00</td><td>09:51</td><td>M-041</td></tr>
+<tr><td>09:13</td><td>09:52</td><td>C-1</td></tr>
+<tr><td>09:45</td><td>10:16</td><td>M-961</td></tr>
+<tr><td>09:50</td><td>10:17</td><td>MD</td></tr>
+<tr><td>09:57</td><td>10:36</td><td>C-1</td></tr>
+<tr><td>10:00</td><td>10:30</td><td>B-042</td></tr>
+<tr><td>10:00</td><td>10:55</td><td>M-041</td></tr>
+<tr><td>10:35</td><td>11:14</td><td>C-1</td></tr>
+<tr><td>10:45</td><td>11:31</td><td>M-967</td></tr>
+<tr><td>11:20</td><td>11:50</td><td>B-042</td></tr>
+<tr><td>11:24</td><td>11:57</td><td>MD</td></tr>
+<tr><td>11:27</td><td>12:06</td><td>C-1</td></tr>
+<tr><td>11:30</td><td>12:25</td><td>M-041</td></tr>
+<tr><td>11:44</td><td>12:30</td><td>M-967</td></tr>
+<tr><td>12:00</td><td>12:55</td><td>M-041</td></tr>
+<tr><td>12:15</td><td>12:45</td><td>B-042</td></tr>
+<tr><td>12:23</td><td>12:49</td><td>MD</td></tr>
+<tr><td>12:35</td><td>13:14</td><td>C-1</td></tr>
+<tr><td>12:45</td><td>13:28</td><td>M-967</td></tr>
+<tr><td>13:20</td><td>13:50</td><td>B-042</td></tr>
+<tr><td>13:30</td><td>14:21</td><td>M-041</td></tr>
+<tr><td>13:35</td><td>14:14</td><td>C-1</td></tr>
+<tr><td>13:45</td><td>14:16</td><td>M-961</td></tr>
+<tr><td>14:00</td><td>14:51</td><td>M-041</td></tr>
+<tr><td>14:02</td><td>14:30</td><td>MD</td></tr>
+<tr><td>14:14</td><td>14:53</td><td>C-1</td></tr>
+<tr><td>14:15</td><td>14:45</td><td>B-042</td></tr>
+<tr><td>14:40</td><td>15:10</td><td>B-042</td></tr>
+<tr><td>14:44</td><td>15:30</td><td>M-967</td></tr>
+<tr><td>14:50</td><td>15:29</td><td>C-1</td></tr>
+<tr><td>15:22</td><td>15:59</td><td>C-1</td></tr>
+<tr><td>15:30</td><td>16:21</td><td>M-041</td></tr>
+<tr><td>15:45</td><td>16:16</td><td>M-961</td></tr>
+<tr><td>15:46</td><td>16:25</td><td>C-1</td></tr>
+<tr><td>15:58</td><td>16:27</td><td>MD</td></tr>
+<tr><td>16:21</td><td>17:00</td><td>C-1</td></tr>
+<tr><td>16:36</td><td>17:15</td><td>C-1</td></tr>
+<tr><td>17:04</td><td>17:30</td><td>MD</td></tr>
+<tr><td>17:25</td><td>17:55</td><td>B-042</td></tr>
+<tr><td>17:30</td><td>18:16</td><td>M-040</td></tr>
+<tr><td>17:32</td><td>18:11</td><td>C-1</td></tr>
+<tr><td>17:45</td><td>18:16</td><td>M-961</td></tr>
+<tr><td>17:58</td><td>18:25</td><td>MD</td></tr>
+<tr><td>18:33</td><td>19:12</td><td>C-1</td></tr>
+<tr><td>19:00</td><td>19:40</td><td>M-060</td></tr>
+<tr><td>19:27</td><td>19:56</td><td>MD</td></tr>
+<tr><td>19:30</td><td>20:16</td><td>M-040</td></tr>
+<tr><td>19:32</td><td>20:11</td><td>C-1</td></tr>
+<tr><td>19:50</td><td>20:35</td><td>M-960</td></tr>
+<tr><td>20:25</td><td>20:55</td><td>B-042</td></tr>
+<tr><td>20:28</td><td>21:07</td><td>C-1</td></tr>
+<tr><td>20:45</td><td>21:25</td><td>M-960</td></tr>
+<tr><td>20:46</td><td>21:14</td><td>MD</td></tr>
+<tr><td>21:30</td><td>22:21</td><td>M-041</td></tr>
+<tr><td>21:33</td><td>22:12</td><td>C-1</td></tr>
+<tr><td>22:02</td><td>22:32</td><td>MD</td></tr>
+<tr><td>22:38</td><td>23:17</td><td>C-1</td></tr>
+<tr><td>23:25</td><td>23:55</td><td>MD</td></tr>
+
+  </table>
+</div>
+
+<div id="ida_sdf" class="section hidden">
+  <table>
+    <tr><th>Salida</th><th>Llegada</th><th>Línea</th></tr>
+    <tr><td>07:44</td><td>08:23</td><td>C-1</td></tr>
+<tr><td>08:40</td><td>09:19</td><td>C-1</td></tr>
+<tr><td>08:42</td><td>09:39</td><td>M-960</td></tr>
+<tr><td>08:55</td><td>09:27</td><td>MD</td></tr>
+<tr><td>09:50</td><td>10:17</td><td>MD</td></tr>
+<tr><td>09:57</td><td>10:36</td><td>C-1</td></tr>
+<tr><td>10:00</td><td>10:30</td><td>B-042</td></tr>
+<tr><td>10:35</td><td>11:14</td><td>C-1</td></tr>
+<tr><td>10:45</td><td>11:26</td><td>M-060</td></tr>
+<tr><td>10:45</td><td>11:25</td><td>M-960</td></tr>
+<tr><td>11:24</td><td>11:57</td><td>MD</td></tr>
+<tr><td>11:27</td><td>12:06</td><td>C-1</td></tr>
+<tr><td>11:30</td><td>12:15</td><td>M-040</td></tr>
+<tr><td>12:23</td><td>12:49</td><td>MD</td></tr>
+<tr><td>12:35</td><td>13:14</td><td>C-1</td></tr>
+<tr><td>12:42</td><td>13:35</td><td>M-960</td></tr>
+<tr><td>12:45</td><td>13:15</td><td>B-042</td></tr>
+<tr><td>13:30</td><td>14:16</td><td>M-040</td></tr>
+<tr><td>13:35</td><td>14:14</td><td>C-1</td></tr>
+<tr><td>13:45</td><td>14:25</td><td>M-960</td></tr>
+<tr><td>14:50</td><td>15:29</td><td>C-1</td></tr>
+<tr><td>15:38</td><td>16:18</td><td>M-961</td></tr>
+<tr><td>15:45</td><td>16:15</td><td>B-042</td></tr>
+<tr><td>15:46</td><td>16:25</td><td>C-1</td></tr>
+<tr><td>15:58</td><td>16:27</td><td>MD</td></tr>
+<tr><td>16:36</td><td>17:15</td><td>C-1</td></tr>
+<tr><td>17:05</td><td>17:35</td><td>B-042</td></tr>
+<tr><td>17:32</td><td>18:11</td><td>C-1</td></tr>
+<tr><td>17:42</td><td>18:35</td><td>M-960</td></tr>
+<tr><td>17:58</td><td>18:25</td><td>MD</td></tr>
+<tr><td>18:25</td><td>18:55</td><td>B-042</td></tr>
+<tr><td>18:30</td><td>19:16</td><td>M-040</td></tr>
+<tr><td>18:33</td><td>19:12</td><td>C-1</td></tr>
+<tr><td>19:00</td><td>19:40</td><td>M-060</td></tr>
+<tr><td>19:27</td><td>19:56</td><td>MD</td></tr>
+<tr><td>19:32</td><td>20:11</td><td>C-1</td></tr>
+<tr><td>20:28</td><td>21:07</td><td>C-1</td></tr>
+<tr><td>20:30</td><td>21:16</td><td>M-040</td></tr>
+<tr><td>20:45</td><td>21:25</td><td>M-960</td></tr>
+<tr><td>20:46</td><td>21:14</td><td>MD</td></tr>
+<tr><td>21:33</td><td>22:12</td><td>C-1</td></tr>
+<tr><td>22:02</td><td>22:32</td><td>MD</td></tr>
+<tr><td>22:38</td><td>23:17</td><td>C-1</td></tr>
+<tr><td>23:25</td><td>23:55</td><td>MD</td></tr>
+
+  </table>
+</div>
+
+<div id="v_lv" class="section hidden">
+  <table>
+    <tr><th>Salida</th><th>Llegada</th><th>Línea</th></tr>
+    <tr><td>05:40</td><td>06:08</td><td>MD</td></tr>
+<tr><td>06:15</td><td>06:52</td><td>C-1</td></tr>
+<tr><td>06:30</td><td>07:13</td><td>M-040</td></tr>
+<tr><td>06:45</td><td>07:11</td><td>MD</td></tr>
+<tr><td>06:49</td><td>07:26</td><td>C-1</td></tr>
+<tr><td>07:00</td><td>07:43</td><td>M-040</td></tr>
+<tr><td>07:10</td><td>07:47</td><td>C-1</td></tr>
+<tr><td>07:40</td><td>08:17</td><td>C-1</td></tr>
+<tr><td>08:00</td><td>08:43</td><td>M-040</td></tr>
+<tr><td>08:00</td><td>08:30</td><td>B-042</td></tr>
+<tr><td>08:00</td><td>08:37</td><td>C-1</td></tr>
+<tr><td>08:00</td><td>08:43</td><td>M-967</td></tr>
+<tr><td>08:40</td><td>09:04</td><td>MD</td></tr>
+<tr><td>08:55</td><td>09:32</td><td>C-1</td></tr>
+<tr><td>09:00</td><td>09:43</td><td>M-040</td></tr>
+<tr><td>09:00</td><td>09:45</td><td>M-967</td></tr>
+<tr><td>09:20</td><td>09:50</td><td>B-042</td></tr>
+<tr><td>09:20</td><td>09:57</td><td>C-1</td></tr>
+<tr><td>09:40</td><td>10:06</td><td>MD</td></tr>
+<tr><td>10:00</td><td>10:50</td><td>M-960</td></tr>
+<tr><td>10:25</td><td>11:02</td><td>C-1</td></tr>
+<tr><td>10:30</td><td>11:13</td><td>M-040</td></tr>
+<tr><td>10:40</td><td>11:10</td><td>B-042</td></tr>
+<tr><td>10:50</td><td>11:16</td><td>MD</td></tr>
+<tr><td>11:00</td><td>11:43</td><td>M-040</td></tr>
+<tr><td>11:00</td><td>11:30</td><td>B-042</td></tr>
+<tr><td>11:00</td><td>11:43</td><td>M-967</td></tr>
+<tr><td>11:23</td><td>12:00</td><td>C-1</td></tr>
+<tr><td>12:00</td><td>12:30</td><td>B-042</td></tr>
+<tr><td>12:00</td><td>12:50</td><td>M-960</td></tr>
+<tr><td>12:09</td><td>12:46</td><td>C-1</td></tr>
+<tr><td>12:30</td><td>13:12</td><td>M-041</td></tr>
+<tr><td>12:40</td><td>13:06</td><td>MD</td></tr>
+<tr><td>13:00</td><td>13:30</td><td>B-042</td></tr>
+<tr><td>13:00</td><td>13:45</td><td>M-967</td></tr>
+<tr><td>13:13</td><td>13:50</td><td>C-1</td></tr>
+<tr><td>13:30</td><td>14:13</td><td>M-041</td></tr>
+<tr><td>13:40</td><td>14:04</td><td>MD</td></tr>
+<tr><td>13:40</td><td>14:08</td><td>MD</td></tr>
+<tr><td>13:45</td><td>14:22</td><td>C-1</td></tr>
+<tr><td>14:00</td><td>14:45</td><td>M-061</td></tr>
+<tr><td>14:05</td><td>14:35</td><td>B-042</td></tr>
+<tr><td>14:05</td><td>14:48</td><td>M-967</td></tr>
+<tr><td>14:20</td><td>14:57</td><td>C-1</td></tr>
+<tr><td>14:30</td><td>15:12</td><td>M-041</td></tr>
+<tr><td>14:40</td><td>15:06</td><td>MD</td></tr>
+<tr><td>14:55</td><td>15:32</td><td>C-1</td></tr>
+<tr><td>15:00</td><td>15:43</td><td>M-967</td></tr>
+<tr><td>15:13</td><td>15:50</td><td>C-1</td></tr>
+<tr><td>15:20</td><td>15:50</td><td>B-042</td></tr>
+<tr><td>15:40</td><td>16:06</td><td>MD</td></tr>
+<tr><td>15:45</td><td>16:22</td><td>C-1</td></tr>
+<tr><td>16:30</td><td>17:13</td><td>M-040</td></tr>
+<tr><td>16:30</td><td>17:07</td><td>C-1</td></tr>
+<tr><td>16:45</td><td>17:15</td><td>B-042</td></tr>
+<tr><td>17:00</td><td>17:33</td><td>M-961</td></tr>
+<tr><td>17:04</td><td>17:41</td><td>C-1</td></tr>
+<tr><td>17:24</td><td>17:49</td><td>MD</td></tr>
+<tr><td>18:00</td><td>18:50</td><td>M-960</td></tr>
+<tr><td>18:14</td><td>18:51</td><td>C-1</td></tr>
+<tr><td>18:30</td><td>19:13</td><td>M-040</td></tr>
+<tr><td>18:40</td><td>19:05</td><td>MD</td></tr>
+<tr><td>19:00</td><td>19:33</td><td>M-961</td></tr>
+<tr><td>19:15</td><td>19:52</td><td>C-1</td></tr>
+<tr><td>19:40</td><td>20:06</td><td>MD</td></tr>
+<tr><td>19:45</td><td>20:15</td><td>B-042</td></tr>
+<tr><td>20:00</td><td>20:45</td><td>M-061</td></tr>
+<tr><td>20:15</td><td>20:52</td><td>C-1</td></tr>
+<tr><td>20:30</td><td>21:12</td><td>M-041</td></tr>
+<tr><td>20:40</td><td>21:06</td><td>MD</td></tr>
+<tr><td>21:00</td><td>21:43</td><td>M-041</td></tr>
+<tr><td>21:00</td><td>21:43</td><td>M-967</td></tr>
+<tr><td>21:05</td><td>21:35</td><td>B-042</td></tr>
+<tr><td>21:15</td><td>21:52</td><td>C-1</td></tr>
+<tr><td>21:45</td><td>22:25</td><td>M-960</td></tr>
+<tr><td>22:15</td><td>22:52</td><td>C-1</td></tr>
+
+  </table>
+</div>
+
+<div id="v_sdf" class="section hidden">
+  <table>
+    <tr><th>Salida</th><th>Llegada</th><th>Línea</th></tr>
+    <tr><td>06:45</td><td>07:11</td><td>MD</td></tr>
+<tr><td>07:10</td><td>07:47</td><td>C-1</td></tr>
+<tr><td>08:00</td><td>08:37</td><td>C-1</td></tr>
+<tr><td>08:40</td><td>09:04</td><td>MD</td></tr>
+<tr><td>09:20</td><td>09:57</td><td>C-1</td></tr>
+<tr><td>10:00</td><td>10:50</td><td>M-960</td></tr>
+<tr><td>10:25</td><td>11:02</td><td>C-1</td></tr>
+<tr><td>10:30</td><td>11:14</td><td>M-040</td></tr>
+<tr><td>10:50</td><td>11:16</td><td>MD</td></tr>
+<tr><td>11:23</td><td>12:00</td><td>C-1</td></tr>
+<tr><td>11:30</td><td>12:13</td><td>M-060</td></tr>
+<tr><td>12:00</td><td>12:44</td><td>M-960</td></tr>
+<tr><td>12:09</td><td>12:46</td><td>C-1</td></tr>
+<tr><td>12:10</td><td>12:40</td><td>B-042</td></tr>
+<tr><td>12:30</td><td>13:13</td><td>M-040</td></tr>
+<tr><td>13:13</td><td>13:50</td><td>C-1</td></tr>
+<tr><td>13:40</td><td>14:04</td><td>MD</td></tr>
+<tr><td>13:40</td><td>14:08</td><td>MD</td></tr>
+<tr><td>14:00</td><td>14:50</td><td>M-960</td></tr>
+<tr><td>14:20</td><td>14:57</td><td>C-1</td></tr>
+<tr><td>15:00</td><td>15:30</td><td>B-042</td></tr>
+<tr><td>15:00</td><td>15:50</td><td>M-960</td></tr>
+<tr><td>15:13</td><td>15:50</td><td>C-1</td></tr>
+<tr><td>15:40</td><td>16:06</td><td>MD</td></tr>
+<tr><td>16:25</td><td>16:55</td><td>B-042</td></tr>
+<tr><td>16:30</td><td>17:07</td><td>C-1</td></tr>
+<tr><td>17:00</td><td>17:40</td><td>M-961</td></tr>
+<tr><td>17:04</td><td>17:41</td><td>C-1</td></tr>
+<tr><td>17:24</td><td>17:49</td><td>MD</td></tr>
+<tr><td>17:30</td><td>18:13</td><td>M-040</td></tr>
+<tr><td>17:45</td><td>18:15</td><td>B-042</td></tr>
+<tr><td>18:14</td><td>18:51</td><td>C-1</td></tr>
+<tr><td>18:40</td><td>19:05</td><td>MD</td></tr>
+<tr><td>19:00</td><td>19:37</td><td>M-961</td></tr>
+<tr><td>19:15</td><td>19:52</td><td>C-1</td></tr>
+<tr><td>19:30</td><td>20:13</td><td>M-040</td></tr>
+<tr><td>19:40</td><td>20:06</td><td>MD</td></tr>
+<tr><td>20:00</td><td>20:40</td><td>M-060</td></tr>
+<tr><td>20:15</td><td>20:52</td><td>C-1</td></tr>
+<tr><td>20:30</td><td>21:00</td><td>B-042</td></tr>
+<tr><td>20:40</td><td>21:06</td><td>MD</td></tr>
+<tr><td>21:15</td><td>21:52</td><td>C-1</td></tr>
+<tr><td>21:45</td><td>22:25</td><td>M-960</td></tr>
+<tr><td>22:15</td><td>22:52</td><td>C-1</td></tr>
+
+  </table>
+</div>
+
+<script>
+function showTable(id, btn) {
+  document.querySelectorAll('.section').forEach(el => {
+    el.classList.remove('visible');
+    el.classList.add('hidden');
+  });
+  document.getElementById(id).classList.remove('hidden');
+  document.getElementById(id).classList.add('visible');
+
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+
+</div>
+</body>
+</html>
