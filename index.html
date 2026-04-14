@@ -44,21 +44,29 @@ h1 {
   box-sizing: border-box;
 }
 
-.weekend-toggle {
+.toolbar {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   align-items: center;
-  gap: 10px;
-  background: #ffffff;
-  border: 1px solid #ddd;
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-size: 14px;
 }
 
-.weekend-toggle input {
-  width: 18px;
-  height: 18px;
-  margin: 0;
+.day-toggle {
+  border: 1px solid #b9b0d9;
+  background: #f3f0ff;
+  color: #5a4a8a;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.day-toggle.weekend {
+  background: #efe8ff;
+  border-color: #aa9dd9;
+  color: #4e3f80;
 }
 
 .filters {
@@ -70,8 +78,8 @@ h1 {
 .filter-chip {
   border: 1px solid #d7dbe3;
   background: #ffffff;
-  color: #444;
-  padding: 6px 10px;
+  color: #4b5563;
+  padding: 7px 12px;
   border-radius: 999px;
   cursor: pointer;
   font-size: 13px;
@@ -153,15 +161,16 @@ td:nth-child(3), th:nth-child(3) {
     El Puerto → Cádiz
   </button>
 
-  <label class="weekend-toggle">
-    <input id="weekendCheckbox" type="checkbox" onchange="updateView()">
-    <span>Mostrar horario de fin de semana</span>
-  </label>
+  <div class="toolbar">
+    <button id="dayToggleBtn" class="day-toggle" type="button" onclick="toggleWeekend()">
+      Laboral
+    </button>
 
-  <div class="filters">
-    <button class="filter-chip active" data-filter="catamaran" type="button" onclick="toggleFilter(this)">⛴ Catamarán</button>
-    <button class="filter-chip active" data-filter="bus" type="button" onclick="toggleFilter(this)">🚌 Bus</button>
-    <button class="filter-chip active" data-filter="tren" type="button" onclick="toggleFilter(this)">🚆 Tren</button>
+    <div class="filters">
+      <button class="filter-chip active" data-filter="catamaran" type="button" onclick="toggleFilter(this)">⛴ Catamarán</button>
+      <button class="filter-chip active" data-filter="bus" type="button" onclick="toggleFilter(this)">🚌 Bus</button>
+      <button class="filter-chip active" data-filter="tren" type="button" onclick="toggleFilter(this)">🚆 Tren</button>
+    </div>
   </div>
 </div>
 
@@ -444,17 +453,22 @@ td:nth-child(3), th:nth-child(3) {
 
 <script>
 let currentDirection = 'ida';
+let isWeekend = false;
 
 function getCurrentSectionId() {
-  const weekend = document.getElementById('weekendCheckbox').checked;
   if (currentDirection === 'ida') {
-    return weekend ? 'ida_sdf' : 'ida_lv';
+    return isWeekend ? 'ida_sdf' : 'ida_lv';
   }
-  return weekend ? 'vuelta_sdf' : 'vuelta_lv';
+  return isWeekend ? 'vuelta_sdf' : 'vuelta_lv';
+}
+
+function getFilterButtons() {
+  return Array.from(document.querySelectorAll('.filter-chip'));
 }
 
 function getActiveFilters() {
-  return Array.from(document.querySelectorAll('.filter-chip.active'))
+  return getFilterButtons()
+    .filter(el => el.classList.contains('active'))
     .map(el => el.dataset.filter);
 }
 
@@ -463,6 +477,12 @@ function updateDirectionButton() {
   btn.textContent = currentDirection === 'ida'
     ? 'El Puerto → Cádiz'
     : 'Cádiz → El Puerto';
+}
+
+function updateDayButton() {
+  const btn = document.getElementById('dayToggleBtn');
+  btn.textContent = isWeekend ? 'Fin de semana' : 'Laboral';
+  btn.classList.toggle('weekend', isWeekend);
 }
 
 function updateVisibleSection() {
@@ -479,7 +499,7 @@ function applyFilters() {
   let active = getActiveFilters();
 
   if (active.length === 0) {
-    document.querySelectorAll('.filter-chip').forEach(el => el.classList.add('active'));
+    getFilterButtons().forEach(el => el.classList.add('active'));
     active = getActiveFilters();
   }
 
@@ -495,17 +515,14 @@ function applyFilters() {
 
     const emptyNote = section.querySelector('.empty-note');
     if (emptyNote) {
-      if (visibleRows === 0) {
-        emptyNote.classList.remove('hidden');
-      } else {
-        emptyNote.classList.add('hidden');
-      }
+      emptyNote.classList.toggle('hidden', visibleRows !== 0);
     }
   });
 }
 
 function updateView() {
   updateDirectionButton();
+  updateDayButton();
   updateVisibleSection();
   applyFilters();
 }
@@ -515,7 +532,22 @@ function toggleDirection() {
   updateView();
 }
 
+function toggleWeekend() {
+  isWeekend = !isWeekend;
+  updateView();
+}
+
 function toggleFilter(btn) {
+  const buttons = getFilterButtons();
+  const activeBefore = getActiveFilters();
+
+  if (activeBefore.length === buttons.length) {
+    buttons.forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+    applyFilters();
+    return;
+  }
+
   btn.classList.toggle('active');
   applyFilters();
 }
