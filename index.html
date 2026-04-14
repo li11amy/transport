@@ -45,45 +45,47 @@ h1 {
 }
 
 .toolbar {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  align-items: center;
-}
-
-.day-toggle {
-  border: 1px solid #b9b0d9;
-  background: #f3f0ff;
-  color: #5a4a8a;
-  padding: 7px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.day-toggle.weekend {
-  background: #efe8ff;
-  border-color: #aa9dd9;
-  color: #4e3f80;
+  align-items: stretch;
 }
 
 .filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: contents;
+}
+
+.day-toggle,
+.filter-chip {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 8px 6px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: clamp(11px, 3vw, 13px);
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.day-toggle {
+  border: 1px solid #9ca3af;
+  background: #ffffff;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.day-toggle.weekend {
+  border-color: #22c55e;
+  background: #ffffff;
+  color: #15803d;
 }
 
 .filter-chip {
   border: 1px solid #d7dbe3;
   background: #ffffff;
   color: #4b5563;
-  padding: 7px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  font-size: 13px;
-  line-height: 1.2;
 }
 
 .filter-chip.active {
