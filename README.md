@@ -46,3 +46,11 @@ Do not manually overwrite index.html without checking Git status.
 - To change the static cache, increment the cache version in `sw.js`.
 
 Installability compatibility 2026-10-28: manifest is .json (GitHub Pages serves the JSON MIME type), 192/512 icon entries provide separate any and maskable purposes; route dropdown is drawn as a CSS chevron. After publishing, test from a fresh Chrome tab, not a messenger webview.
+
+## PWA installability validation (2026-10-28)
+A temporary GitHub Actions Chrome 156 check on the public site returned:
+- Page.getAppManifest: no manifest errors; expected scope/start URL, icons and display=standalone.
+- Page.getInstallabilityErrors: [] (no installability errors).
+- Service worker: active and controlling /transport/; offline cache transport-bahia-v2 present.
+- PNG images 192×192 and 512×512 decoded successfully in Chrome.
+- On one Android device, Chrome nevertheless displayed "Esta aplicación no se puede instalar" in the "Instalar y crear acceso directo" sheet. This is an Android-specific unresolved issue; see Chromium 570202962 (fixed bug concerning that precise menu state). Diagnose Chrome/Android installation separately rather than repeatedly changing the manifest without evidence.
