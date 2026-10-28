@@ -40,7 +40,7 @@ Do not manually overwrite index.html without checking Git status.
 ## Install on a phone as a PWA
 - Installable app assets: manifest.json, sw.js, icon-180.png, icon-192.png, icon-512.png. All paths must retain the GitHub Pages project prefix `/transport/`.
 - The canonical generator `build_horarios.py` includes the manifest link, install button and service-worker registration, so daily regenerated `index.html` retains PWA support.
-- Android Chrome/Samsung Internet: menu → Install app. The in-page Instalar app button appears only when the browser emits beforeinstallprompt. It remains hidden in embedded browsers, where the installation API is unavailable.
+- Android Chrome/Samsung Internet: open the website in Chrome, then use the native browser menu → Install app. The website does not intercept beforeinstallprompt or provide a custom install button; it lets Chrome own its install UI.
 - iOS: Share → Add to Home Screen → Open as Web App; iOS does not support the programmatic install prompt.
 - Service worker caches static icons and the last downloaded timetable. **Navigation is network-first**: while online, request the updated site; offline, fall back to the most recently saved timetable. The UI shows a warning when offline.
 - To change the static cache, increment the cache version in `sw.js`.
@@ -54,3 +54,6 @@ A temporary GitHub Actions Chrome 156 check on the public site returned:
 - Service worker: active and controlling /transport/; offline cache transport-bahia-v2 present.
 - PNG images 192×192 and 512×512 decoded successfully in Chrome.
 - On one Android device, Chrome nevertheless displayed "Esta aplicación no se puede instalar" in the "Instalar y crear acceso directo" sheet. This is an Android-specific unresolved issue; see Chromium 570202962 (fixed bug concerning that precise menu state). Diagnose Chrome/Android installation separately rather than repeatedly changing the manifest without evidence.
+
+## Android installation fix — 2026-10-28
+On the user's Android phone, Squoosh and Bottle Butler were installable but this site was not. We removed the custom beforeinstallprompt.preventDefault() handler and in-page installation button from both the generator and checked-in index.html to restore Chrome's native install flow. This is a targeted change; installation on the physical Android device still requires confirmation.

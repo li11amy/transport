@@ -167,6 +167,7 @@ HTML = r"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#2d6cdf">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Horarios Bahía">
 <link rel="manifest" href="/transport/manifest.json">
 <link rel="icon" href="/transport/icon-192.png" sizes="192x192" type="image/png">
@@ -213,18 +214,13 @@ tr.uncertain{background:#fff0f0}
 tr.uncertain td:nth-child(3){color:#b91c1c;font-weight:650}
 .uncertain .day-warning{display:block;color:#b91c1c;font-size:11px;font-weight:650}
 a{color:#1f4fa8}
-.pwa-install{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:-6px 0 14px}
-.pwa-install[hidden],.offline-notice[hidden]{display:none}
-.install-btn{border:1px solid #9db8ee;background:#eef4ff;color:#1f4fa8;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:650;cursor:pointer}
+.offline-notice[hidden]{display:none}
 .offline-notice{background:#fff6e5;color:#804600;border:1px solid #e8c37b;border-radius:10px;padding:9px 12px;margin-bottom:11px;font-size:13px;line-height:1.4}
 </style>
 </head>
 <body>
 <main class="wrapper">
 <h1>Horarios de transporte</h1>
-<div class="pwa-install" id="pwaInstall" hidden>
-  <button type="button" class="install-btn" id="installAppBtn">Instalar app</button>
-</div>
 <div class="offline-notice" id="offlineNotice" role="status" hidden>Sin conexión. Horarios guardados: pueden haber cambiado. Compruébalos antes de viajar.</div>
 <div class="controls">
   <div class="route-selector">
@@ -405,28 +401,8 @@ document.querySelectorAll(".day-btn,.filter-chip").forEach(b=>b.setAttribute("ar
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/transport/sw.js", {scope:"/transport/"}).catch(e=>console.warn("PWA unavailable",e));
 }
-const pwaInstall=document.getElementById("pwaInstall");
-const standalone=window.matchMedia("(display-mode: standalone)").matches || navigator.standalone===true;
-let deferredInstall=null;
-// Show a real install button only when the browser exposes a usable install prompt.
-// In-app browsers cannot install PWAs: never show a misleading button there.
-window.addEventListener("beforeinstallprompt",e=>{
-  e.preventDefault();
-  deferredInstall=e;
-  if(!standalone)pwaInstall.hidden=false;
-});
-document.getElementById("installAppBtn").addEventListener("click",async()=>{
-  if(!deferredInstall){pwaInstall.hidden=true;return;}
-  const prompt=deferredInstall;
-  deferredInstall=null;
-  pwaInstall.hidden=true;
-  await prompt.prompt();
-  await prompt.userChoice;
-});
-window.addEventListener("appinstalled",()=>{
-  pwaInstall.hidden=true;
-  deferredInstall=null;
-});
+// Let the browser handle PWA installation; do not call preventDefault()
+// on beforeinstallprompt, because that suppresses its own install UX.
 const offlineNotice=document.getElementById("offlineNotice");
 function updateConnection(){offlineNotice.hidden=navigator.onLine;}
 window.addEventListener("offline",updateConnection);
