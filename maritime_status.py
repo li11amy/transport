@@ -105,6 +105,16 @@ def evaluate_status(data, now, payload):
               "checked_at": observed.isoformat(timespec="seconds"),
               "red": 0, "yellow": 0, "source": PUBLIC_URL}
     changes = []
+    # A fresh operational maritime status outranks an old headline-only warning.
+    for route, trips in data.items():
+        if route not in ("cadiz-puerto", "puerto-cadiz"):
+            continue
+        for trip in trips:
+            if trip.get("linea") == FERRY and trip.get("estado") == "warning" and _runs_today(trip.get("dias"), now):
+                trip.pop("estado", None)
+                trip.pop("detalle", None)
+                trip.pop("fuente_cambio", None)
+                trip.pop("fecha_cambio", None)
     for kind, window in windows:
         if not isinstance(window, dict):
             continue
