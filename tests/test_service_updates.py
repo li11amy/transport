@@ -71,6 +71,28 @@ class FakeHttp:
         return FakeResponse(self.mapping[url])
 
 
+def static_index(trip_id="RENFE_TEST", first="51400", last="51405"):
+    return {
+        "trips": {
+            trip_id: {"service": "WEEKDAYS", "route": "R1", "stops": [
+                {"stop_id": first, "seq": 1, "arrival": "09:59:00",
+                 "departure": "10:00:00"},
+                {"stop_id": last, "seq": 2, "arrival": "10:30:00",
+                 "departure": "10:31:00"},
+            ]}
+        },
+        "calendars": {"WEEKDAYS": {
+            "start_date": "20260101", "end_date": "20261231",
+            "wednesday": "1", "tuesday": "1", "monday": "1",
+            "thursday": "1", "friday": "1", "saturday": "0", "sunday": "0"}},
+        "exceptions": {},
+    }
+
+
+def fake_index_loader(code, now):
+    return static_index(), None
+
+
 class ServiceUpdateTests(unittest.TestCase):
     def test_verified_rail_delay_preserves_planned_times(self):
         data = {"puerto-cadiz": [trip()]}
@@ -80,7 +102,7 @@ class ServiceUpdateTests(unittest.TestCase):
         ])
         http = FakeHttp({updates.RENFE["C-1"]: live,
                          updates.RENFE["MD"]: feed([])})
-        events, problems = updates.rail_changes(data, NOW, http)
+        events, problems = updates.rail_changes(data, NOW, http, index_loader=fake_index_loader)
         self.assertFalse(problems)
         self.assertEqual(len(events), 1)
         self.assertEqual(data["puerto-cadiz"][0]["salida"], "10:00")
@@ -88,14 +110,41 @@ class ServiceUpdateTests(unittest.TestCase):
         self.assertEqual(data["puerto-cadiz"][0]["llegada_actual"], "10:35")
         self.assertEqual(data["puerto-cadiz"][0]["estado"], "confirmed")
 
-    def test_single_station_does_not_rewrite_train(self):
+    def test_single_station_departure_is_confirmed(self):
         data = {"puerto-cadiz": [trip()]}
         http = FakeHttp({
             updates.RENFE["C-1"]: feed([stop("51400", epoch(10, 0), 300, "departure")]),
             updates.RENFE["MD"]: feed([])})
-        events, problems = updates.rail_changes(data, NOW, http)
+        events, problems = updates.rail_changes(
+            data, NOW, http, index_loader=fake_index_loader)
         self.assertFalse(problems)
-        self.assertFalse(events)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(data["puerto-cadiz"][0]["salida_actual"], "10:05")
+        self.assertNotIn("llegada_actual", data["puerto-cadiz"][0])
+
+    def test_origin_arrival_does_not_change_departure(self):
+        data = {"puerto-cadiz": [trip()]}
+        http = FakeHttp({
+            updates.RENFE["C-1"]: feed([stop("51400", epoch(9, 59), 180, "arrival")]),
+            updates.RENFE["MD"]: feed([])})
+        events, problems = updates.rail_changes(
+            data, NOW, http, index_loader=fake_index_loader)
+        self.assertFalse(problems)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(data["puerto-cadiz"][0]["estado"], "warning")
+        self.assertNotIn("salida_actual", data["puerto-cadiz"][0])
+
+    def test_yesterdays_md_train_is_ignored(self):
+        data = {"puerto-cadiz": [trip("MD")]}
+        delayed = feed([stop("51400", epoch(10, 0), 180, "departure")])
+        delayed["entity"][0]["tripUpdate"]["trip"]["tripId"] = "1303512026-10-27"
+        index = static_index("1303512026-10-27")
+        http = FakeHttp({updates.RENFE["C-1"]: feed([]),
+                         updates.RENFE["MD"]: delayed})
+        events, problems = updates.rail_changes(
+            data, NOW, http, index_loader=lambda code, now: (index, None))
+        self.assertFalse(problems)
+        self.assertEqual(events, [])
         self.assertNotIn("estado", data["puerto-cadiz"][0])
 
     def test_stale_feed_ignored(self):
@@ -104,7 +153,7 @@ class ServiceUpdateTests(unittest.TestCase):
             stop("51400", epoch(10, 0), 300, "departure"),
             stop("51405", epoch(10, 30), 300)], epoch(8, 0))
         http = FakeHttp({updates.RENFE["C-1"]: delayed, updates.RENFE["MD"]: feed([])})
-        events, problems = updates.rail_changes(data, NOW, http)
+        events, problems = updates.rail_changes(data, NOW, http, index_loader=fake_index_loader)
         self.assertFalse(events)
         self.assertTrue(any("stale" in issue for issue in problems))
         self.assertNotIn("salida_actual", data["puerto-cadiz"][0])
