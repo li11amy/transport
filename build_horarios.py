@@ -401,15 +401,6 @@ function update() {
       dateLabel.className="small";
       dateLabel.textContent="Renfe · "+t.fecha_servicio.split("-").reverse().join("/");
       line.appendChild(dateLabel);
-      if(t.fuente_horario) {
-        const originLink=document.createElement("a");
-        originLink.href=t.fuente_horario;
-        originLink.textContent="Horario oficial";
-        originLink.target="_blank";
-        originLink.rel="noopener noreferrer";
-        originLink.className="service-detail";
-        line.appendChild(originLink);
-      }
     }
     if(status) {
       const detail=document.createElement("small");
