@@ -38,9 +38,11 @@ Do not manually overwrite index.html without checking Git status.
   /home/ubuntu/Backups/Transport/before_release_2026-10-28/
 
 ## Install on a phone as a PWA
-- Installable app assets: manifest.webmanifest, sw.js, icon-180.png, icon-192.png, icon-512.png. All paths must retain the GitHub Pages project prefix `/transport/`.
+- Installable app assets: manifest.json, sw.js, icon-180.png, icon-192.png, icon-512.png. All paths must retain the GitHub Pages project prefix `/transport/`.
 - The canonical generator `build_horarios.py` includes the manifest link, install button and service-worker registration, so daily regenerated `index.html` retains PWA support.
 - Android Chrome/Samsung Internet: menu → Install app. The in-page Instalar app button appears only when the browser emits beforeinstallprompt. It remains hidden in embedded browsers, where the installation API is unavailable.
 - iOS: Share → Add to Home Screen → Open as Web App; iOS does not support the programmatic install prompt.
 - Service worker caches static icons and the last downloaded timetable. **Navigation is network-first**: while online, request the updated site; offline, fall back to the most recently saved timetable. The UI shows a warning when offline.
 - To change the static cache, increment the cache version in `sw.js`.
+
+Installability compatibility 2026-10-28: manifest is .json (GitHub Pages serves the JSON MIME type), 192/512 icon entries provide separate any and maskable purposes; route dropdown is drawn as a CSS chevron. After publishing, test from a fresh Chrome tab, not a messenger webview.

@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#2d6cdf">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Horarios Bahía">
-<link rel="manifest" href="/transport/manifest.webmanifest">
+<link rel="manifest" href="/transport/manifest.json">
 <link rel="icon" href="/transport/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/transport/icon-180.png">
 <title>Horarios de transporte · Bahía de Cádiz</title>
@@ -25,6 +25,8 @@ h1{font-size:26px;margin:4px 0 16px}
 .route-arrow{font-size:20px;opacity:.9;flex:0 0 auto;margin:0 8px}
 .route-list-toggle{width:47px;min-height:55px;border:1px solid #9db8ee;border-radius:14px;background:#eef4ff;color:#1f4fa8;font-size:23px;cursor:pointer}
 .route-list-toggle[aria-expanded="true"]{background:#dce9ff}
+.route-chevron{display:inline-block;width:11px;height:11px;border-right:2.5px solid currentColor;border-bottom:2.5px solid currentColor;transform:rotate(45deg) translate(-2px,-2px);transition:transform .15s}
+.route-list-toggle[aria-expanded="true"] .route-chevron{transform:rotate(225deg) translate(-2px,-2px)}
 .route-menu{display:grid;grid-template-columns:1fr;gap:6px;margin-top:-5px;border-radius:12px;background:white;border:1px solid #d7dbe3;padding:7px}
 .route-menu[hidden]{display:none}
 .route-choice{border:1px solid transparent;border-radius:9px;background:#fff;color:#333;text-align:left;padding:11px 12px;font-size:15px;cursor:pointer}
@@ -69,7 +71,7 @@ a{color:#1f4fa8}
       <span class="route-arrow" aria-hidden="true">⇄</span>
       <span class="route-leg"><small>Hasta</small><strong id="routeTo">Cádiz</strong></span>
     </button>
-    <button id="routeListBtn" class="route-list-toggle" type="button" aria-label="Elegir par de ciudades" aria-expanded="false" aria-controls="routeMenu">⌄</button>
+    <button id="routeListBtn" class="route-list-toggle" type="button" aria-label="Elegir par de ciudades" aria-expanded="false" aria-controls="routeMenu"><span class="route-chevron" aria-hidden="true"></span></button>
   </div>
   <div class="route-menu" id="routeMenu" hidden>
     <button class="route-choice active" type="button" data-pair="puerto-cadiz">El Puerto ↔ Cádiz</button>
