@@ -118,3 +118,79 @@ systemctl list-timers transport-update.timer
 This reuses the existing `transport-update.service` and update script.
 Frequent runs may produce frequent GitHub Pages commits. No service
 configuration or production site changes until the operator installs it.
+
+
+## Move to peluche-ebanache.com/transport/ (prepared 2026-10-28)
+
+**Goal:** serve static app shell from Nginx and refresh only
+`/transport/transport_data.json` every 15 minutes. No recurring Git commits,
+no Astro/Docker rebuild and no modification of the AVÍO app.
+
+- Source checkout: `/home/ubuntu/Sites/transport`.
+- Dedicated public webroot: `/srv/www/transport`; **no source files or secrets**.
+- The existing service/timer remain `transport-update.service` /
+  `transport-update.timer`; a new **ExecStart** override replaces the
+  Git-pushing publisher with `deploy/refresh-vps-data.sh`.
+- `build_horarios.py --data-only` writes JSON atomically without generating HTML.
+- The PWA loads fresh JSON on opening, returning to the foreground, and every
+  minute while visible. The timer still generates JSON every 15 minutes.
+- Offline fallback uses the last cached JSON; when absent, it can still show
+  the schedule embedded in the static HTML shell.
+
+**Do not switch the production service before verifying Nginx.** The safe
+deployment uses an isolated temporary Git worktree, leaving the currently
+running `main` checkout untouched until activation.
+
+### Phase 1 — stage files and test HTTPS (no timer or AVÍO changes)
+
+On VPS `vps-cd9917e0`:
+
+```bash
+cd /home/ubuntu/Sites/transport
+hostname
+pwd
+git status --short
+git fetch origin
+git worktree add --detach /home/ubuntu/Sites/transport-vps-prep \
+  origin/feature/standalone-vps-transport-20261028
+cd /home/ubuntu/Sites/transport-vps-prep
+bash deploy/stage-vps-site.sh
+sudo python3 deploy/enable-nginx-transport.py
+curl -I https://peluche-ebanache.com/transport/
+curl -I https://peluche-ebanache.com/transport/transport_data.json
+curl -fsS https://peluche-ebanache.com/transport/transport_data.json \
+  | python3 -c 'import sys,json; p=json.load(sys.stdin); print("routes:",len(p["data"]),"checked:",p["meta"]["checked_at"])'
+```
+
+Nginx installer is *fail-closed*: it requires the existing
+`/etc/nginx/sites-enabled/peluche-ebanache.com` HTTPS server block, rejects
+an existing `/transport` location, backs up config, verifies `nginx -t`,
+then reloads. Failed tests revert the config. The existing
+`location /` for AVÍO must be preserved.
+
+### Phase 2 — switch the 15-minute timer to JSON-only
+
+Only after Phase 1 succeeds:
+
+```bash
+cd /home/ubuntu/Sites/transport-vps-prep
+bash deploy/activate-vps-refresh.sh
+cat /home/ubuntu/Sites/transport/output/service_change_report.json
+systemctl list-timers --all transport-update.timer --no-pager
+journalctl -u transport-update.service -n 30 --no-pager
+```
+
+Activation first stops the old timer and waits for any running update to end;
+checks clean Git state, merges the feature branch with the current `main`,
+runs tests, installs a unit drop-in and starts the JSON-only updater. It
+leaves the old GitHub Pages URL as a non-updating backup; **the new live URL**
+is `https://peluche-ebanache.com/transport/`.
+
+### Verification
+
+A normal refresh should show a successful service and a changed
+`/srv/www/transport/transport_data.json` modification time. Git `HEAD`
+must **not** move every 15 minutes. The JSON report's `events: []` means
+*no matched changes*, not proof that there were no disruptions. Confirm
+matching against a real Renfe update before trusting the green status
+completely.
