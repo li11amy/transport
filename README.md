@@ -332,3 +332,58 @@ the app refreshes JSON. If the browser cannot provide an install prompt, the
 manual menu instructions will be shown instead. Browser installations may
 show an add-to-home-screen shortcut rather than a standalone install depending
 on the platform/browser.
+
+## B-042 maritime live status (2026-10-28)
+
+The **authoritative** maritime status source is
+`https://cmtbc.es/api/v2/web/estadomaritimo`, used by the Consorcio's public
+`https://cmtbc.es/?op=maritimo` page (via `api.estadomaritimo()`).
+Unlike static CMTBC line-news pages, the JSON has a server-generated
+`fecha_consulta`, `lineas.B-042.suspendida`, `suspension`, and `proxima`.
+The latter objects provide `fecha_inicio`, `fecha_fin`, `causa`, and
+`texto` containing the authority's explanation and sometimes precise
+departure times and replacement buses.
+
+`maritime_status.py` verifies the source timestamp and only applies effects
+to **today's** B-042 rows:
+
+- **Red** if the authority explicitly lists that direction + exact departure,
+  or expressly cancels all departures in a valid suspension window.
+- **Yellow** if an active/planned disruption is confirmed but its precise
+  affected departures cannot be established. Never guess that a whole route
+  is cancelled merely because `suspendida: true`.
+- **Yellow** when the live API is down/stale/invalid, to avoid silently
+  presenting unverified boat services as normal.
+- **White** and small `⛴ B-042 · Operativo` label when the fresh API reports
+  no relevant disruption. This is a last-check status, not a guarantee.
+- If active disruption affects today's departures, a concise
+  `⛴ B-042 · Incidencias` label appears, and the exact affected rows are
+  colored. Tapping a highlighted row reveals cause/source.
+- Deduplicated Telegram notifications include affected departures,
+  authority's cause and available bus-replacement explanation. Generic
+  B-042 headlines are suppressed when the live JSON is valid.
+
+The production 15-minute systemd timer remains the same. No Git commit is
+made by periodic updates. If deploying from Git, use
+`deploy/upgrade-maritime-pwa.sh`: a separate clean worktree is used for
+offline tests, an isolated build, and verifying a fresh maritime response
+**before** fast-forwarding the source checkout and publishing HTML/JSON.
+This does not modify Nginx, AVÍO, Docker or service definitions.
+
+## Android installability diagnosis
+
+The production manifest, icons (192x192 and 512x512 PNG), HTTPS, standalone
+mode, service worker scope and content types were verified via GitHub Actions.
+On 2026-10-28 headless Chromium returned `Page.getInstallabilityErrors: []`
+and an active controlling transport service worker. Chrome on one actual
+Android device still displayed `Esta aplicación no se puede instalar`; this
+does not establish a server-side defect. Installable PWAs on Android may
+depend on the browser, Google Mobile Services, and device policy.
+
+The in-page **Instalar app** control is now shown only after
+`beforeinstallprompt` is actually offered, rather than directing an
+uninstallable Android device to a browser menu with a disabled install option.
+This is a truthful UI improvement, not a claim that Android-side WebAPK
+installation was repaired. Read-only diagnostics remain in
+`scripts/diagnose_maritime_pwa.py` and
+`scripts/inspect_pwa_browser.cjs`; network audits are not part of routine CI.
