@@ -332,3 +332,41 @@ the app refreshes JSON. If the browser cannot provide an install prompt, the
 manual menu instructions will be shown instead. Browser installations may
 show an add-to-home-screen shortcut rather than a standalone install depending
 on the platform/browser.
+
+## Android Chrome PWA installation — RGB icon compatibility test
+
+On 2026-10-28, Chrome Android showed a disabled Install entry for the
+`/transport/` app while Bottle Butler and unrelated PWAs installed on the
+same device. The live site passed Chromium desktop/DevTools installability
+(`Page.getInstallabilityErrors: []`) and had a controlling service worker.
+
+A public comparison found:
+
+- Transport launcher PNGs were **indexed palette** PNG (color type 3).
+- Bottle Butler's installable icons were **truecolor RGB** PNG (color type 2),
+  with a dedicated `maskable` asset.
+- Transport is served in `/transport/`; Bottle Butler starts from its
+  own domain root. Chromium issue
+  `https://issues.chromium.org/issues/570202962` documents the **same
+  disabled Android install sheet**, including path and icon qualification
+  problems. However, this does not prove which condition affects this phone.
+
+The conservative test in `fix/android-transport-pwa-install-20261028`
+keeps the same origin/scope and site. It adds visually equivalent
+`icon-192-rgb.png`, `icon-512-rgb.png`, and a blue, safe-zone
+`icon-512-maskable.png`; uses a new manifest resource query `?v=2`
+and service worker cache `transport-bahia-v4`. Source conversion is
+reproducible with `python3 scripts/convert_pwa_icons.py` (Pillow required).
+The binary icons are **committed**; deployment does not need Pillow.
+
+Deploy only the PWA assets using `deploy/apply-android-pwa-icons.sh`, which
+runs offline tests, prepares HTML from current public JSON, and copies
+assets atomically without refetching schedules or changing the 15-minute
+timer, Nginx, Docker or AVÍO.
+
+**Validation:** Android Chrome must now offer the *enabled* `Instalar`
+option in `⋮ → Instalar y crear acceso directo` and launch a separate
+standalone app, not merely a Chrome shortcut. If it remains disabled,
+this experiment falsifies the icon-format hypothesis; the next reasonable
+diagnostic is Android Chrome version and a root-scoped subdomain staging
+site, **not** resetting production or claiming success based on desktop CI.
