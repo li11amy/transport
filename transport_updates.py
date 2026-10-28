@@ -407,6 +407,8 @@ def apply_changes(data, sender, now=None, session=None):
     bus, bus_problems = bus_notices(data, now, session, statistics)
     from maritime_status import live_maritime_changes
     ferry, ferry_problems = live_maritime_changes(data, now, session, statistics)
+    if statistics.get("MARITIME_B042", {}).get("status") != "unavailable":
+        bus = [event for event in bus if event.get("line") != "B-042"]
     # The maritime JSON is more authoritative for B-042 than news headlines.
     # Avoid 10 Telegram messages for the same advisory repeated in city-pair views.
     unique = {event["id"]: event for event in rail + bus + ferry}
