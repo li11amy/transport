@@ -1,6 +1,6 @@
 // Network-first schedule; cached timetable only when offline.
-const CACHE="transport-bahia-v3", ROOT="/transport/";
-const ASSETS=[ROOT,ROOT+"manifest.json",ROOT+"icon-180.png",ROOT+"icon-192.png",ROOT+"icon-512.png"];
+const CACHE="transport-bahia-v4", ROOT="/transport/";
+const ASSETS=[ROOT,ROOT+"manifest.json",ROOT+"icon-180.png",ROOT+"icon-192-rgb.png",ROOT+"icon-512-rgb.png",ROOT+"icon-512-maskable.png"];
 self.addEventListener("install",event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });
