@@ -10,9 +10,17 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from renfe_static_gtfs import load_index, service_active
-from transport_updates import RENFE, fetch_json, fresh_feed
+from transport_updates import RENFE, fetch_json, fresh_feed, static_trip_matches
 
 now = datetime.now(ZoneInfo("Europe/Madrid"))
+try:
+    from build_horarios import ROUTES, source_url, fetch, parse
+    ctan = {a + "-" + b: parse(fetch(source_url(a, b)), a, b)[0]
+            for a, b in ROUTES}
+    print("CTAN rows:", {key: len(rows) for key, rows in ctan.items()}, flush=True)
+except Exception as exc:
+    print("CTAN site unavailable in CI:", str(exc), flush=True)
+    ctan = {}
 with tempfile.TemporaryDirectory() as directory:
     for line, url in RENFE.items():
         index, warning = load_index(line, now, cache_dir=directory)
@@ -38,6 +46,9 @@ with tempfile.TemporaryDirectory() as directory:
             "realtime_entities": len(feed["entity"]),
             "joined_by_trip_id": len(join),
             "active_today": len(current),
+            "ctan_matched_today": sum(
+                len(static_trip_matches(ctan, line, index["trips"][tid], now))
+                for tid in current),
             "warning": warning,
         }, ensure_ascii=False), flush=True)
         if not index["trips"] or not join:
