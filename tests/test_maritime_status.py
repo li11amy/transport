@@ -83,6 +83,20 @@ class MarineTests(unittest.TestCase):
         self.assertEqual(changes,[])
         self.assertNotIn("estado",rows["cadiz-puerto"][0])
 
+    def test_scheduled_partial_suspension_is_red_only_on_named_departure(self):
+        rows=data()
+        upcoming=window(
+            "Salidas desde Cádiz destino El Puerto: 14:35"
+            "<br>Servicios alternativos por carretera disponibles.")
+        events,errors=live_maritime_changes(rows,NOW,session=FakeHttp(status(
+            False,upcoming=upcoming)))
+        self.assertEqual(errors,[])
+        self.assertEqual(len(events),1)
+        self.assertIn("Motivos operacionales",events[0]["detail"])
+        self.assertIn("alternativos",events[0]["detail"])
+        self.assertEqual(rows["cadiz-puerto"][1]["estado"],"cancelled")
+        self.assertNotIn("estado",rows["cadiz-puerto"][0])
+
     def test_unavailable_status_warns_and_notifies_once(self):
         rows=data()
         events,errors=live_maritime_changes(
