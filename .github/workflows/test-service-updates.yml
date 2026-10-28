@@ -5,12 +5,16 @@ on:
       - "transport_updates.py"
       - "build_horarios.py"
       - "tests/**"
+      - "deploy/**"
+      - "sw.js"
       - ".github/workflows/test-service-updates.yml"
   pull_request:
     paths:
       - "transport_updates.py"
       - "build_horarios.py"
       - "tests/**"
+      - "deploy/**"
+      - "sw.js"
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -22,3 +26,5 @@ jobs:
       - run: python -m pip install requests beautifulsoup4
       - run: python -m compileall -q build_horarios.py transport_updates.py tests
       - run: python -m unittest discover -s tests -v
+      - run: bash -n deploy/*.sh
+      - run: python -m py_compile deploy/enable-nginx-transport.py
