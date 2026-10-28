@@ -11,10 +11,19 @@ body{margin:0;padding:16px}
 .wrapper{max-width:510px;margin:auto}
 h1{font-size:26px;margin:4px 0 16px}
 .controls{display:grid;gap:12px;margin-bottom:14px}
-.route-selector{display:grid;grid-template-columns:minmax(0,1fr) 38px minmax(0,1fr);align-items:end;gap:7px}
-.route-field label{display:block;color:#666;font-size:12px;margin:0 0 5px 6px}
-.route-field select{width:100%;height:45px;padding:0 6px;border:1px solid #9db8ee;border-radius:11px;background:#fff;color:#1f4fa8;font-weight:650;font-size:15px}
-.swap{height:45px;width:38px;border:1px solid #9db8ee;background:#eef4ff;color:#1f4fa8;border-radius:11px;font-size:21px;cursor:pointer}
+.route-selector{display:grid;grid-template-columns:minmax(0,1fr) 47px;gap:7px}
+.direction-toggle{display:flex;align-items:center;justify-content:space-between;min-width:0;min-height:55px;background:#2d6cdf;color:white;border:1px solid #2d6cdf;border-radius:14px;padding:8px 11px;cursor:pointer;text-align:left}
+.route-leg{display:grid;gap:3px;min-width:0}
+.route-leg small{font-size:11px;opacity:.8;font-weight:450}
+.route-leg strong{font-size:16px;line-height:1.1;font-weight:650;overflow-wrap:anywhere}
+.route-arrow{font-size:20px;opacity:.9;flex:0 0 auto;margin:0 8px}
+.route-list-toggle{width:47px;min-height:55px;border:1px solid #9db8ee;border-radius:14px;background:#eef4ff;color:#1f4fa8;font-size:23px;cursor:pointer}
+.route-list-toggle[aria-expanded="true"]{background:#dce9ff}
+.route-menu{display:grid;grid-template-columns:1fr;gap:6px;margin-top:-5px;border-radius:12px;background:white;border:1px solid #d7dbe3;padding:7px}
+.route-menu[hidden]{display:none}
+.route-choice{border:1px solid transparent;border-radius:9px;background:#fff;color:#333;text-align:left;padding:11px 12px;font-size:15px;cursor:pointer}
+.route-choice:hover,.route-choice:focus{background:#eef4ff}
+.route-choice.active{background:#eef4ff;border-color:#9db8ee;color:#1f4fa8;font-weight:650}
 .days{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
 .day-btn,.filter-chip{min-width:0;cursor:pointer;border-radius:100px;background:#fff;border:1px solid #d7dbe3;color:#4b5563;font-size:13px;line-height:1.25;padding:9px 5px;text-align:center}
 .day-btn.active{background:#2d6cdf;border-color:#2d6cdf;color:#fff;font-weight:650}
@@ -37,13 +46,17 @@ a{color:#1f4fa8}
 <h1>Horarios de transporte</h1>
 <div class="controls">
   <div class="route-selector">
-    <div class="route-field"><label for="from">Desde</label><select id="from">
-      <option value="puerto">El Puerto</option><option value="cadiz">Cádiz</option><option value="jerez">Jerez</option>
-    </select></div>
-    <button type="button" class="swap" id="swap" title="Invertir trayecto" aria-label="Invertir trayecto">↔</button>
-    <div class="route-field"><label for="to">Hasta</label><select id="to">
-      <option value="puerto">El Puerto</option><option value="cadiz" selected>Cádiz</option><option value="jerez">Jerez</option>
-    </select></div>
+    <button id="directionBtn" class="direction-toggle" type="button" title="Invertir trayecto" aria-label="Invertir trayecto">
+      <span class="route-leg"><small>Desde</small><strong id="routeFrom">El Puerto</strong></span>
+      <span class="route-arrow" aria-hidden="true">⇄</span>
+      <span class="route-leg"><small>Hasta</small><strong id="routeTo">Cádiz</strong></span>
+    </button>
+    <button id="routeListBtn" class="route-list-toggle" type="button" aria-label="Elegir par de ciudades" aria-expanded="false" aria-controls="routeMenu">⌄</button>
+  </div>
+  <div class="route-menu" id="routeMenu" hidden>
+    <button class="route-choice active" type="button" data-pair="puerto-cadiz">El Puerto ↔ Cádiz</button>
+    <button class="route-choice" type="button" data-pair="puerto-jerez">El Puerto ↔ Jerez</button>
+    <button class="route-choice" type="button" data-pair="cadiz-jerez">Cádiz ↔ Jerez</button>
   </div>
   <div class="days" aria-label="Día de viaje">
     <button type="button" class="day-btn active" data-day="lunes_jueves">Lun.–Jue.</button>
@@ -77,23 +90,39 @@ const PREFERRED = {
   "cadiz":{"bus":"Plaza de Sevilla-Estación de Cádiz","tren":"Plaza de Sevilla-Estación de Cádiz","catamaran":"Terminal Marítima Cádiz"},
   "jerez":{"bus":"Estación de Jerez","tren":"Estación de Jerez"}
 };
-const from = document.getElementById("from");
-const to = document.getElementById("to");
 const body = document.getElementById("schedule");
+const routeMenu = document.getElementById("routeMenu");
+const routeListBtn = document.getElementById("routeListBtn");
+let fromCity = "puerto", toCity = "cadiz";
 let day = "lunes_jueves";
 let types = new Set(["bus","tren","catamaran"]);
-let lastFrom = "puerto", lastTo = "cadiz";
+function currentPair() {
+  return [fromCity,toCity].sort().join("-");
+}
+function setMenu(open) {
+  routeMenu.hidden = !open;
+  routeListBtn.setAttribute("aria-expanded",String(open));
+}
+function updateRouteControls() {
+  document.getElementById("routeFrom").textContent=NAMES[fromCity];
+  document.getElementById("routeTo").textContent=NAMES[toCity];
+  document.querySelectorAll(".route-choice").forEach(b=>{
+    const selected=b.dataset.pair.split("-").every(city=>[fromCity,toCity].includes(city));
+    b.classList.toggle("active",selected);
+    b.setAttribute("aria-pressed",String(selected));
+  });
+}
 function operates(code) {
   if (code === "L-D") return true;
   if (day === "lunes_jueves") return ["L-V","L-S","L-J","L-D"].includes(code);
-  if (day === "viernes") return ["L-V","L-S","L-D"].includes(code);
+  if (day === "viernes") return ["L-V","L-S","L-D","V"].includes(code);
   if (day === "sabado") return ["L-S","S-D-F","L-D","S"].includes(code);
   return ["S-D-F","L-D","D"].includes(code);
 }
 function tdWithStop(time, stop, city, type) {
   const td=document.createElement("td");
   td.appendChild(document.createTextNode(time));
-  if (stop && stop !== PREFERRED[city][type]) {
+  if (stop) {
     const small=document.createElement("small");
     small.className="small";
     small.textContent=stop;
@@ -102,14 +131,15 @@ function tdWithStop(time, stop, city, type) {
   return td;
 }
 function update() {
-  const key=from.value+"-"+to.value;
+  const key=fromCity+"-"+toCity;
+  updateRouteControls();
   const trips=(DATA[key]||[]).filter(t=>types.has(t.tipo)&&operates(t.dias));
   body.replaceChildren();
   const fragment=document.createDocumentFragment();
   for(const t of trips) {
     const tr=document.createElement("tr");
-    tr.appendChild(tdWithStop(t.salida,t.parada_salida,from.value,t.tipo));
-    tr.appendChild(tdWithStop(t.llegada,t.parada_llegada,to.value,t.tipo));
+    tr.appendChild(tdWithStop(t.salida,t.parada_salida,fromCity,t.tipo));
+    tr.appendChild(tdWithStop(t.llegada,t.parada_llegada,toCity,t.tipo));
     const line=document.createElement("td");
     line.appendChild(document.createTextNode(t.linea));
     const small=document.createElement("small");
@@ -121,20 +151,34 @@ function update() {
   }
   body.appendChild(fragment);
   document.getElementById("empty").hidden=trips.length>0;
-  document.getElementById("source").href="https://siu.cmtbc.es/es/horarios_origen_destino.php?ida="+{"puerto":8,"cadiz":1,"jerez":14}[from.value]+"&vuelta="+{"puerto":8,"cadiz":1,"jerez":14}[to.value];
+  document.getElementById("source").href="https://siu.cmtbc.es/es/horarios_origen_destino.php?ida="+{"puerto":8,"cadiz":1,"jerez":14}[fromCity]+"&vuelta="+{"puerto":8,"cadiz":1,"jerez":14}[toCity];
 }
-function changed(which) {
-  if (from.value === to.value) {
-    if (which === "from") to.value=lastFrom;
-    else from.value=lastTo;
-  }
-  lastFrom=from.value;lastTo=to.value;
+document.getElementById("directionBtn").addEventListener("click",()=>{
+  [fromCity,toCity]=[toCity,fromCity];
+  setMenu(false);
   update();
-}
-from.addEventListener("change",()=>changed("from"));
-to.addEventListener("change",()=>changed("to"));
-document.getElementById("swap").addEventListener("click",()=>{
-  const a=from.value;from.value=to.value;to.value=a;lastFrom=from.value;lastTo=to.value;update();
+});
+routeListBtn.addEventListener("click",()=>{
+  setMenu(routeMenu.hidden);
+});
+document.querySelectorAll(".route-choice").forEach(b=>b.addEventListener("click",()=>{
+  const [a,c]=b.dataset.pair.split("-");
+  if(fromCity===a||fromCity===c) {
+    toCity=fromCity===a?c:a;
+  } else {
+    fromCity=a;toCity=c;
+  }
+  setMenu(false);
+  update();
+}));
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape" && !routeMenu.hidden) {
+    setMenu(false);
+    routeListBtn.focus();
+  }
+});
+document.addEventListener("click",e=>{
+  if(!routeMenu.hidden && !e.target.closest(".route-menu,.route-list-toggle")) setMenu(false);
 });
 document.querySelectorAll(".day-btn").forEach(btn=>btn.addEventListener("click",()=>{
   day=btn.dataset.day;
