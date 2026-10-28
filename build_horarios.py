@@ -7,6 +7,7 @@ import os
 import re
 import hashlib
 import argparse
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -49,9 +50,48 @@ def source_url(a, b):
 
 
 def fetch(url):
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=25)
-    r.raise_for_status()
-    return r.text
+    """Bound CMTBC requests; retry only transient network failures."""
+    for attempt in range(2):
+        try:
+            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"},
+                             timeout=(7, 15))
+            r.raise_for_status()
+            return r.text
+        except (requests.Timeout, requests.ConnectionError):
+            if attempt == 0:
+                time.sleep(2)
+                continue
+            raise
+
+
+def cached_ctan_route(route):
+    """Use last published bus/boat rows only, with explicit stale-data warning.
+
+    A lost CMTBC response must never block a valid Renfe refresh or display
+    last known bus times as confirmed. Do not cache train times here.
+    """
+    warning = ("Consorcio sin respuesta: horario de autobús/barco "
+               "no verificado en esta actualización")
+    for path in (DATA_OUTPUT, Path("/srv/www/transport/transport_data.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            entries = payload["data"][route]
+            if not isinstance(entries, list):
+                continue
+            rows = []
+            for item in entries:
+                if not isinstance(item, dict) or item.get("tipo") not in ("bus", "catamaran"):
+                    continue
+                if not all(k in item for k in ("linea", "salida", "llegada", "dias")):
+                    continue
+                row = item.copy()
+                row["aviso"] = warning
+                rows.append(row)
+            if rows:
+                return rows
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return None
 
 
 def pick_stop(stops, times, city, kind):
@@ -564,8 +604,20 @@ def build(data_only=False):
     try:
         for origin, destination in ROUTES:
             url = source_url(origin, destination)
-            trips, dropped = parse(fetch(url), origin, destination)
             key = origin + "-" + destination
+            try:
+                trips, dropped = parse(fetch(url), origin, destination)
+            except (requests.RequestException, ValueError) as exc:
+                trips = cached_ctan_route(key)
+                if trips is None:
+                    # Never publish an incomplete route as a normal timetable.
+                    raise RuntimeError("CMTBC {} unavailable, no safe bus/boat cache: {}".format(
+                        key, exc)) from exc
+                dropped = []
+                message = "CMTBC sin respuesta; autobuses/barcos con datos anteriores ({})".format(
+                    type(exc).__name__)
+                issues.append({"route": key, "detail": message})
+                print("STALE CMTBC {}: {}".format(key, exc), flush=True)
             data[key] = trips
             for trip in trips:
                 if trip["aviso"]:
