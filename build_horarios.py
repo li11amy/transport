@@ -273,7 +273,7 @@ a{color:#1f4fa8}
  Las horas marcadas con ≈ son aproximadas.
  Para días festivos, comprueba las excepciones.
  <a id="source" href="#" target="_blank" rel="noopener noreferrer">Fuente: Consorcio de Transportes</a>.
- <span>Consultado el __UPDATED__.</span>
+ <span>Datos del Consorcio y Renfe.</span>
  <span id="serviceStatus"></span>
  <span>Actualizaciones ferroviarias: Renfe (CC BY 4.0).</span>
 </p>
