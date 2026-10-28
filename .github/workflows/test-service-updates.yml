@@ -44,3 +44,8 @@ jobs:
       - name: Inspect maritime/PWA source availability (network diagnostic)
         run: python scripts/diagnose_maritime_pwa.py
         continue-on-error: true
+      - name: Inspect browser PWA installability via Chrome
+        run: |
+          npm install --no-save puppeteer-core
+          node scripts/inspect_pwa_browser.cjs
+        continue-on-error: true
