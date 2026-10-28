@@ -109,6 +109,8 @@ def build_index_from_zip(zf):
             service = entry.get("service_id")
             if service not in services:
                 continue
+            if "date" not in entry or "exception_type" not in entry:
+                raise ValueError("Renfe calendar_dates columns: {}".format(list(entry)))
             exceptions.setdefault(service, {})[entry["date"]] = entry["exception_type"]
 
     return {"trips": trips, "calendars": calendars, "exceptions": exceptions}
