@@ -56,6 +56,30 @@ class StaticGTFS(unittest.TestCase):
         self.assertFalse(gtfs.service_active(index, "C1A", date(2026, 10, 29)))
         self.assertTrue(gtfs.service_active(index, "C1A", date(2026, 10, 31)))
 
+    def test_missing_stop_sequence_uses_ordered_gtfs_clocks(self):
+        source = static_zip()
+        with zipfile.ZipFile(source) as original:
+            tables = {name: original.read(name).decode("utf-8")
+                      for name in original.namelist()}
+        tables["stop_times.txt"] = tables["stop_times.txt"].replace(
+            "trip_id,stop_id,stop_sequence,arrival_time,departure_time",
+            "trip_id,stop_id,arrival_time,departure_time")
+        tables["stop_times.txt"] = "\n".join(
+            ",".join(parts[:2] + parts[3:]) if parts and parts[0] != "" else line
+            for line in tables["stop_times.txt"].split("\n")
+            for parts in [line.split(",")])
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            for name, body in tables.items():
+                zf.writestr(name, body)
+        buf.seek(0)
+        with zipfile.ZipFile(buf) as zf:
+            index = gtfs.build_index_from_zip(zf)
+        stops = index["trips"]["C1A"]["stops"]
+        self.assertEqual([x["seq"] for x in stops], [1, 2, 3])
+        self.assertEqual([x["stop_id"] for x in stops],
+                         ["51300", "51400", "51405"])
+
     def test_date_embedded_in_md_trip_id(self):
         with zipfile.ZipFile(static_zip()) as zf:
             index = gtfs.build_index_from_zip(zf)
