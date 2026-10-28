@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - "transport_updates.py"
+      - "scripts/diagnose_maritime_pwa.py"
       - "build_horarios.py"
       - "tests/**"
       - "deploy/**"
@@ -40,3 +41,6 @@ jobs:
         continue-on-error: true
       - run: bash -n deploy/*.sh
       - run: python -m py_compile deploy/enable-nginx-transport.py
+      - name: Inspect maritime/PWA source availability (network diagnostic)
+        run: python scripts/diagnose_maritime_pwa.py
+        continue-on-error: true
