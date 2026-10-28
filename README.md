@@ -230,19 +230,18 @@ zero services. `renfe_schedule.py` now replaces only the CMTBC train rows with
 Renfe static GTFS dated departures, retaining CMTBC bus and boat rows.
 
 The existing four weekday buttons show the **nearest corresponding dates**
-from the official Renfe calendar: Mon–Thu, Friday, Saturday, Sunday. Each
-Renfe row displays its exact source service date and links to the official
-Renfe GTFS archive. This does **not** claim that every future weekday has
+from the official Renfe calendar: Mon–Thu, Friday, Saturday, Sunday. The
+UI displays the selected train service date once above the table, not in every row. This does **not** claim that every future weekday has
 identical service; a fully date-based picker would be needed for arbitrary
 future days or holiday exceptions.
 
 GTFS-RT updates match exact `tripId` and `fecha_servicio`. They do not
 guess closest time in the CMTBC table. Only explicitly updated departure and
-arrival times turn green; a delay at another stop is yellow when the shown
-endpoint time has not been verified. Confirmed cancelled trips are red.
+arrival times overwrite the displayed times; the row turns **yellow** for a
+change or an unresolved advisory. Confirmed cancelled trips turn **red**.
 
 If a Renfe static feed cannot be loaded, the former CMTBC train rows stay
-visible **red as unverified**; they must not be silently treated as official
+visible **yellow as unverified**; they must not be silently treated as official
 Renfe times. JSON updates still do not create Git commits.
 
 Diagnostics for each source are included under `meta.renfe_schedule` and the
@@ -269,3 +268,29 @@ retrieved, the last valid public/local JSON is used for **bus/boat only** with
 a visible unverified-source warning and a Telegram diagnostic. Official Renfe
 train data is never restored from stale CMTBC clocks. If no safe cached
 bus/boat route exists, generation fails without publishing a partial timetable.
+
+## Compact mobile timetable status (2026-10-28)
+
+A colored whole row replaces large per-trip paragraphs on the main screen:
+
+- **Red**: verified cancellation (Renfe GTFS-RT); the scheduled time remains
+  visible because the row is still listed.
+- **Yellow**: reported change, partial/uncertain update, or unverified upstream
+  data (e.g. a temporary CMTBC timeout). An explicitly revised departure or
+  arrival is shown as the primary time, without duplicating the old time.
+- **White**: ordinary scheduled trip; white does **not** guarantee punctuality.
+
+A short two-color legend replaces the large warning banner. Users may tap or
+keyboard-activate a marked row to reveal the full official message and source
+link. Normal rows remain compact. The train date appears **once** above the
+table (because weekday tabs show a representative upcoming date). The former
+per-train `Renfe · DD/MM/YYYY` labels have been removed.
+
+The destination cell always uses `parada_llegada` rather than a lowercase
+city identifier.
+
+Apply this UI-only change on the transport VPS with
+`deploy/apply-compact-ui.sh`. This script checks host, clean Git status,
+existing site and in-flight timer, then tests and creates a new HTML shell
+using the **currently published JSON**, without contacting CTAN/Renfe or
+changing systemd/Nginx/Docker. The JSON-only 15-minute update continues.
