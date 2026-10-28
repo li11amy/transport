@@ -223,7 +223,15 @@ HTML = r"""<!doctype html>
 *{box-sizing:border-box}
 body{margin:0;padding:16px}
 .wrapper{max-width:510px;margin:auto}
-h1{font-size:26px;margin:4px 0 16px}
+h1{font-size:clamp(23px,5vw,26px);margin:4px 0 5px;text-align:center;line-height:1.2}
+.page-heading{margin-bottom:17px}
+.page-meta{display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap;min-height:24px}
+.area-label{color:#697486;font-size:12px;letter-spacing:.01em}
+.install-link{border:0;background:none;color:#1f4fa8;font-weight:600;font-size:12px;padding:4px 5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.install-help{position:relative;margin-top:9px;padding:11px 32px 11px 12px;border-radius:10px;background:#fff;border:1px solid #d7dbe3;color:#4b5563;font-size:12px;line-height:1.5}
+.install-help p{margin:0}
+.install-help button{position:absolute;top:5px;right:5px;border:0;background:none;color:#6b7280;font-size:20px;cursor:pointer;min-width:30px;min-height:30px}
+.install-help[hidden],.install-link[hidden]{display:none}
 .controls{display:grid;gap:12px;margin-bottom:14px}
 .route-selector{display:grid;grid-template-columns:minmax(0,1fr) 47px;gap:7px}
 .direction-toggle{display:flex;align-items:center;justify-content:space-between;min-width:0;min-height:55px;background:#2d6cdf;color:white;border:1px solid #2d6cdf;border-radius:14px;padding:8px 11px;cursor:pointer;text-align:left}
@@ -254,10 +262,11 @@ td:nth-child(3){font-size:14px;color:#444}
 .small{display:block;color:#777;font-size:10px;line-height:1.25;margin-top:3px;max-width:160px;overflow-wrap:anywhere}
 .empty-note{text-align:center;color:#666;font-size:14px;padding:18px 0}
 .source-note{font-size:12px;color:#777;line-height:1.5;margin-top:12px}
-.reference-date{font-size:12px;color:#6b7280;margin-top:-4px;margin-bottom:2px}
+.reference-date{font-size:12px;color:#64748b;margin-top:-4px;margin-bottom:2px}
 .reference-date[hidden],.status-legend[hidden],.trip-extra[hidden]{display:none}
-.status-legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:0 1px 10px;font-size:12px;color:#5c626a}
-.status-legend span{display:inline-flex;align-items:center;gap:5px}
+.status-legend{display:flex;gap:7px 12px;align-items:center;flex-wrap:wrap;margin:0 1px 10px;padding:9px 10px;border:1px solid #e1e5ec;border-radius:10px;background:#fff;font-size:11px;color:#596474}
+.status-legend span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.status-legend .legend-hint{margin-left:auto;color:#778395}
 .status-dot{display:inline-block;width:11px;height:11px;border-radius:3px}
 .status-dot.cancelled{background:#f1a3a3}
 .status-dot.changed{background:#eac565}
@@ -278,7 +287,17 @@ a{color:#1f4fa8}
 </head>
 <body>
 <main class="wrapper">
-<h1>Horarios de transporte</h1>
+<header class="page-heading">
+  <h1>Horarios de transporte</h1>
+  <div class="page-meta">
+    <span class="area-label">El Puerto · Cádiz · Jerez</span>
+    <button type="button" class="install-link" id="installButton">Instalar app</button>
+  </div>
+  <div class="install-help" id="installHelp" hidden role="status">
+    <button type="button" id="closeInstallHelp" aria-label="Cerrar instrucciones">×</button>
+    <p id="installInstructions"></p>
+  </div>
+</header>
 <div class="offline-notice" id="offlineNotice" role="status" hidden>Sin conexión. Horarios guardados: pueden haber cambiado. Compruébalos antes de viajar.</div>
 <div class="controls">
   <div class="route-selector">
@@ -309,21 +328,19 @@ a{color:#1f4fa8}
 </div>
 <div id="warningSummary" class="status-legend" aria-label="Leyenda de cambios" hidden>
   <span><i class="status-dot cancelled" aria-hidden="true"></i>Cancelado</span>
-  <span><i class="status-dot changed" aria-hidden="true"></i>Cambios o pendiente de comprobar</span>
-  <span>ⓘ Toca la fila para detalles</span>
+  <span><i class="status-dot changed" aria-hidden="true"></i>Cambio / aviso</span>
+  <span class="legend-hint">ⓘ Toca para ver más</span>
 </div>
 <div class="section">
  <table><thead><tr><th>Salida</th><th>Llegada</th><th>Línea</th></tr></thead><tbody id="schedule"></tbody></table>
  <div class="empty-note" id="empty" hidden>No hay servicios para los filtros elegidos.</div>
 </div>
 <p class="source-note">
- Horas de paso en la parada indicada; en autobús pueden variar por el tráfico.
- Las horas marcadas con ≈ son aproximadas.
- Para días festivos, comprueba las excepciones.
- <a id="source" href="#" target="_blank" rel="noopener noreferrer">Fuente: Consorcio de Transportes</a>.
- <span>Datos del Consorcio y Renfe.</span>
+ Horarios previstos. Los autobuses pueden variar por el tráfico; ≈ indica una hora estimada.
+ En festivos, consulta los avisos.
+ <a id="source" href="#" target="_blank" rel="noopener noreferrer">Consorcio de Transportes</a>
+ · Datos ferroviarios: Renfe (CC BY 4.0).
  <span id="serviceStatus"></span>
- <span>Actualizaciones ferroviarias: Renfe (CC BY 4.0).</span>
 </p>
 </main>
 <script>
@@ -419,7 +436,7 @@ function update() {
     .map(t=>t.fecha_servicio))].sort();
   reference.hidden=dates.length===0;
   reference.textContent=dates.length
-    ? "Trenes Renfe · "+dates.map(d=>d.split("-").reverse().join("/")).join(", ")
+    ? "Trenes Renfe · horarios del "+dates.map(d=>d.split("-").reverse().join("/")).join(", ")
     : "";
   body.replaceChildren();
   const fragment=document.createDocumentFragment();
@@ -553,8 +570,50 @@ renderSourceStatus();
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/transport/sw.js", {scope:"/transport/"}).catch(e=>console.warn("PWA unavailable",e));
 }
-// Let the browser handle PWA installation; do not call preventDefault()
-// on beforeinstallprompt, because that suppresses its own install UX.
+// Chrome/Android: native install prompt when the browser grants one.
+// Browsers without beforeinstallprompt: show short menu instructions instead.
+const installButton=document.getElementById("installButton");
+const installHelp=document.getElementById("installHelp");
+const installInstructions=document.getElementById("installInstructions");
+let deferredInstallPrompt=null;
+const installedMode=()=>window.matchMedia("(display-mode: standalone)").matches||
+  window.navigator.standalone===true;
+function updateInstallVisibility(){
+  installButton.hidden=installedMode();
+  if(installedMode())installHelp.hidden=true;
+}
+window.addEventListener("beforeinstallprompt",event=>{
+  event.preventDefault();
+  deferredInstallPrompt=event;
+  updateInstallVisibility();
+});
+window.addEventListener("appinstalled",()=>{
+  deferredInstallPrompt=null;
+  installButton.hidden=true;
+  installHelp.hidden=true;
+});
+installButton.addEventListener("click",async()=>{
+  if(deferredInstallPrompt){
+    const prompt=deferredInstallPrompt;
+    deferredInstallPrompt=null;
+    try{
+      const choice=await prompt.prompt();
+      if(choice&&choice.outcome==="accepted"){
+        installHelp.hidden=true;
+        return;
+      }
+    }catch(error){console.warn("Install prompt unavailable",error);}
+  }
+  const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+  installInstructions.textContent=ios
+    ? "En Safari, toca Compartir y elige «Añadir a pantalla de inicio»."
+    : "En Chrome, abre el menú ⋮ y elige «Instalar aplicación» o «Añadir a pantalla de inicio».";
+  installHelp.hidden=false;
+});
+document.getElementById("closeInstallHelp").addEventListener("click",()=>{
+  installHelp.hidden=true;
+});
+updateInstallVisibility();
 const offlineNotice=document.getElementById("offlineNotice");
 function updateConnection(){offlineNotice.hidden=navigator.onLine;}
 window.addEventListener("offline",updateConnection);
