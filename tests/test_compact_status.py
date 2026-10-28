@@ -17,7 +17,6 @@ class CompactStatusTests(unittest.TestCase):
     def test_status_colors_and_disclosure_are_consistent(self):
         self.assertIn('if(cancelled) tr.classList.add("service-cancelled")', HTML)
         self.assertIn('else if(marked) tr.classList.add("service-warning")', HTML)
-        self.assertIn("tr.service-warning,tr.service-confirmed{", HTML) if False else None
         self.assertIn("tr.uncertain,tr.service-warning,tr.service-confirmed{background:#fff3d1}", HTML)
         self.assertIn('extra.hidden=true;', HTML)
         self.assertIn('tr.addEventListener("keydown"', HTML)
