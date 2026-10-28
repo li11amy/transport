@@ -61,9 +61,6 @@ class StaticGTFS(unittest.TestCase):
         with zipfile.ZipFile(source) as original:
             tables = {name: original.read(name).decode("utf-8")
                       for name in original.namelist()}
-        tables["stop_times.txt"] = tables["stop_times.txt"].replace(
-            "trip_id,stop_id,stop_sequence,arrival_time,departure_time",
-            "trip_id,stop_id,arrival_time,departure_time")
         tables["stop_times.txt"] = "\n".join(
             ",".join(parts[:2] + parts[3:]) if parts and parts[0] != "" else line
             for line in tables["stop_times.txt"].split("\n")
