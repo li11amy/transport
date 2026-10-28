@@ -29,7 +29,12 @@ def each_csv(zf, filename):
     with zf.open(filename) as stream:
         with io.TextIOWrapper(stream, encoding="utf-8-sig", errors="replace",
                               newline="") as handle:
-            yield from csv.DictReader(handle)
+            reader = csv.DictReader(handle)
+            reader.fieldnames = [field.strip() if isinstance(field, str) else field
+                                 for field in reader.fieldnames]
+            for row in reader:
+                yield {key: value.strip() if isinstance(value, str) else value
+                       for key, value in row.items()}
 
 
 def build_index_from_zip(zf):
