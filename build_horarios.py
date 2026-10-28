@@ -165,6 +165,12 @@ HTML = r"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2d6cdf">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Horarios Bahía">
+<link rel="manifest" href="/transport/manifest.webmanifest">
+<link rel="icon" href="/transport/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="/transport/icon-180.png">
 <title>Horarios de transporte · Bahía de Cádiz</title>
 <style>
 :root{font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;color:#222;background:#f5f6f8}
@@ -205,11 +211,21 @@ tr.uncertain{background:#fff0f0}
 tr.uncertain td:nth-child(3){color:#b91c1c;font-weight:650}
 .uncertain .day-warning{display:block;color:#b91c1c;font-size:11px;font-weight:650}
 a{color:#1f4fa8}
+.pwa-install{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:-6px 0 14px}
+.pwa-install[hidden],.pwa-help[hidden],.offline-notice[hidden]{display:none}
+.install-btn{border:1px solid #9db8ee;background:#eef4ff;color:#1f4fa8;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:650;cursor:pointer}
+.pwa-help{width:100%;font-size:12px;line-height:1.4;color:#555}
+.offline-notice{background:#fff6e5;color:#804600;border:1px solid #e8c37b;border-radius:10px;padding:9px 12px;margin-bottom:11px;font-size:13px;line-height:1.4}
 </style>
 </head>
 <body>
 <main class="wrapper">
 <h1>Horarios de transporte</h1>
+<div class="pwa-install" id="pwaInstall" hidden>
+  <button type="button" class="install-btn" id="installAppBtn">Instalar app</button>
+  <span class="pwa-help" id="pwaHelp" hidden></span>
+</div>
+<div class="offline-notice" id="offlineNotice" role="status" hidden>Sin conexión. Horarios guardados: pueden haber cambiado. Compruébalos antes de viajar.</div>
 <div class="controls">
   <div class="route-selector">
     <button id="directionBtn" class="direction-toggle" type="button" title="Invertir trayecto" aria-label="Invertir trayecto">
@@ -385,6 +401,38 @@ document.querySelectorAll(".filter-chip").forEach(btn=>btn.addEventListener("cli
   update();
 }));
 document.querySelectorAll(".day-btn,.filter-chip").forEach(b=>b.setAttribute("aria-pressed",String(b.classList.contains("active"))));
+// PWA setup is part of the generated HTML so each daily update preserves installation.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/transport/sw.js", {scope:"/transport/"}).catch(e=>console.warn("PWA unavailable",e));
+}
+const pwaInstall=document.getElementById("pwaInstall");
+const pwaHelp=document.getElementById("pwaHelp");
+const ios=/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1);
+const standalone=window.matchMedia("(display-mode: standalone)").matches || navigator.standalone===true;
+let deferredInstall=null;
+if(!standalone && /Android|iPad|iPhone|iPod/i.test(navigator.userAgent))pwaInstall.hidden=false;
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault();deferredInstall=e;if(!standalone)pwaInstall.hidden=false;
+});
+document.getElementById("installAppBtn").addEventListener("click",async()=>{
+  if(deferredInstall){
+    const prompt=deferredInstall;deferredInstall=null;prompt.prompt();
+    const choice=await prompt.userChoice;
+    if(choice.outcome==="accepted")pwaInstall.hidden=true;
+  } else {
+    pwaHelp.hidden=false;
+    pwaHelp.textContent=ios
+      ? "En Safari: Compartir → Añadir a pantalla de inicio → Abrir como app."
+      : "En Chrome: menú ⋮ → Instalar aplicación o Añadir a pantalla de inicio.";
+  }
+});
+window.addEventListener("appinstalled",()=>{pwaInstall.hidden=true;});
+const offlineNotice=document.getElementById("offlineNotice");
+function updateConnection(){offlineNotice.hidden=navigator.onLine;}
+window.addEventListener("offline",updateConnection);
+window.addEventListener("online",updateConnection);
+updateConnection();
 update();
 </script>
 </body>

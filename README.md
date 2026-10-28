@@ -36,3 +36,11 @@ Do not manually overwrite index.html without checking Git status.
   /home/li11amy/Backups/Transport/transport_el_puerto_cadiz_BEFORE_JEREZ_2026-10-28.tar.gz
 - Original VPS release files:
   /home/ubuntu/Backups/Transport/before_release_2026-10-28/
+
+## Install on a phone as a PWA
+- Installable app assets: manifest.webmanifest, sw.js, icon-180.png, icon-192.png, icon-512.png. All paths must retain the GitHub Pages project prefix `/transport/`.
+- The canonical generator `build_horarios.py` includes the manifest link, install button and service-worker registration, so daily regenerated `index.html` retains PWA support.
+- Android Chrome/Samsung Internet: menu → Install app, or the in-page Instalar app button when the browser presents installation.
+- iOS: Share → Add to Home Screen → Open as Web App; iOS does not support the programmatic install prompt.
+- Service worker caches static icons and the last downloaded timetable. **Navigation is network-first**: while online, request the updated site; offline, fall back to the most recently saved timetable. The UI shows a warning when offline.
+- To change the static cache, increment the cache version in `sw.js`.
