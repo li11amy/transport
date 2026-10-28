@@ -13,7 +13,8 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
-from transport_updates import apply_changes
+from transport_updates import apply_changes, date_now
+from renfe_schedule import replace_ctan_trains, reference_day
 
 BASE_URL = "https://siu.cmtbc.es/es/horarios_origen_destino.php"
 CITIES = {"puerto": (8, "El Puerto"), "cadiz": (1, "Cádiz"), "jerez": (14, "Jerez")}
@@ -395,6 +396,21 @@ function update() {
     small.textContent=t.aviso ? "⚠ "+(t.dias||"?") : t.dias;
     if(t.aviso) {small.classList.add("day-warning"); small.title=t.aviso;}
     line.appendChild(small);
+    if(t.tipo==="tren" && t.fecha_servicio) {
+      const dateLabel=document.createElement("small");
+      dateLabel.className="small";
+      dateLabel.textContent="Renfe · "+t.fecha_servicio.split("-").reverse().join("/");
+      line.appendChild(dateLabel);
+      if(t.fuente_horario) {
+        const originLink=document.createElement("a");
+        originLink.href=t.fuente_horario;
+        originLink.textContent="Horario oficial";
+        originLink.target="_blank";
+        originLink.rel="noopener noreferrer";
+        originLink.className="service-detail";
+        line.appendChild(originLink);
+      }
+    }
     if(status) {
       const detail=document.createElement("small");
       detail.className="service-detail";
@@ -566,12 +582,15 @@ def build(data_only=False):
     except Exception as exc:
         report_issues([{"route": "ERROR", "detail": str(exc)}])
         raise
+    source_problems, train_stats = replace_ctan_trains(data, date_now())
+    issues.extend({"route": "Renfe", "detail": issue} for issue in source_problems)
     report_issues(issues)
     try:
         meta = apply_changes(data, notify_telegram)
     except Exception as exc:
         print("Service updates unavailable, preserving planned timetable: {}".format(exc), flush=True)
         meta = {}
+    meta["renfe_schedule"] = train_stats
     for origin, destination in ROUTES:
         key = origin + "-" + destination
         trips = data[key]
