@@ -2,7 +2,7 @@
 # Run as ubuntu on VPS after inspecting host, directory and git state.
 set -euo pipefail
 
-REPO="/home/ubuntu/Sites/transport"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PUBLIC="/srv/www/transport"
 
 echo "HOST=$(hostname)"
