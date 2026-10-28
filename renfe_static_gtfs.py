@@ -45,7 +45,7 @@ def build_index_from_zip(zf):
             continue
         local.setdefault(trip_id, []).append({
             "stop_id": station,
-            "seq": int(entry["stop_sequence"]),
+            "seq": int(entry["stop_sequence"]) if entry.get("stop_sequence") else None,
             "arrival": entry.get("arrival_time", ""),
             "departure": entry.get("departure_time", ""),
         })
@@ -59,7 +59,29 @@ def build_index_from_zip(zf):
         service = entry.get("service_id", "")
         if not service:
             continue
-        stops = sorted(local[trip_id], key=lambda x: x["seq"])
+        stops = local[trip_id]
+        if all(x["seq"] is None for x in stops):
+            # Some Renfe exports omit stop_sequence. Use their GTFS scheduled
+            # clocks (including 24+ hour values), not arbitrary input order.
+            def gtfs_seconds(row):
+                value = row.get("arrival") or row.get("departure") or ""
+                try:
+                    hour, minute, second = (int(p) for p in value.split(":"))
+                    return hour * 3600 + minute * 60 + second
+                except (ValueError, TypeError):
+                    return None
+
+            if any(gtfs_seconds(x) is None for x in stops):
+                continue
+            stops = sorted(stops, key=gtfs_seconds)
+            if len({gtfs_seconds(x) for x in stops}) != len(stops):
+                continue
+            for position, item in enumerate(stops, start=1):
+                item["seq"] = position
+        elif any(x["seq"] is None for x in stops):
+            continue
+        else:
+            stops = sorted(stops, key=lambda x: x["seq"])
         if len({x["stop_id"] for x in stops}) != len(stops):
             # Repeated station: stop ID alone cannot unambiguously match one event.
             continue
