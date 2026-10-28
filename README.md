@@ -3,7 +3,7 @@
 Live: https://li11amy.github.io/transport/
 
 One production page: index.html (generated). The canonical generator is build_horarios.py in this repository.
-It reads all six origin/destination timetable tables from https://siu.cmtbc.es and provides bus, train and ferry filters.
+It reads bus/boat schedules from https://siu.cmtbc.es and official dated train schedules from Renfe static GTFS, with GTFS-RT updates. Six origin/destination views provide bus, train and ferry filters.
 
 ## Route and stop rules
 - El Puerto de Santa María: Plaza de Toros is preferred for buses that stop there. Otherwise display the actual stop, normalizing «Estación FC» and «Intercambiador El Pto. de Sta. María» to Estación El Puerto; source stop names are retained in the generated data.
@@ -73,10 +73,10 @@ that line for *today* get a review marker, with the link to the source.
 Notices about fares do not produce service flags.
 
 **Green:** only when the Renfe realtime feed is fresh (<10 minutes) and
-**both** station stop updates identify an exact, unambiguous scheduled CMTBC
-train on today's date. The original times remain in `salida` / `llegada`;
+the Renfe `tripId` joins the exact GTFS service date, direction and official
+train timetable row (not the older CMTBC train table). The original times remain in `salida` / `llegada`;
 the new times are in `salida_actual` / `llegada_actual`.
-Unmatched trip IDs, one-station updates, and newly added trains without
+Unmatched trip IDs and newly added trains without
 matching schedule data are **not** automatically inserted. They require
 a GTFS static trip-ID crosswalk before safe automatic adoption.
 
@@ -194,3 +194,78 @@ must **not** move every 15 minutes. The JSON report's `events: []` means
 *no matched changes*, not proof that there were no disruptions. Confirm
 matching against a real Renfe update before trusting the green status
 completely.
+
+## Renfe one-stop realtime join (2026-10-28)
+
+Previous logic required both station updates in a single realtime entity. Live
+Renfe feeds predominantly provide only one stop per train; this produced 0
+matches even though static `trip_id` matches exist (C-1: 247/317; MD: 271/283
+in the diagnostic snapshot). The new `renfe_static_gtfs.py` downloads Renfe
+GTFS once daily and caches a compact index of trains that serve Jerez,
+El Puerto or Cádiz in `output/gtfs_cache/` (ignored by Git).
+
+- Identify the train by exact `tripId`, active service calendar and today,
+  direction (ordered GTFS stops) and the exact generated Renfe timetable row.
+- Only modify an endpoint time when that specific **arrival or departure**
+  is explicitly provided. Do **not** extrapolate one stop to another.
+- If a station inside the segment reports a delay but the endpoint timing is
+  unverified, show a yellow warning instead of fabricating a green time.
+- Previous-day MD services (date in `tripId`), stale feeds, implausibly large
+  time differences, and unknown calendar services cannot override the schedule.
+- A matching, date-valid cancellation may mark a trip red, including when the
+  GTFS-RT cancellation does not provide individual station updates.
+- Daily static GTFS failures are reported. A prior compact index may be used
+  for up to 48 hours, with a diagnostic warning; otherwise no updates apply.
+- Diagnostics now include `gtfs_ids`, `today_ids`, `matched_trips`,
+  `changes` and `advisories` per Renfe feed.
+
+Validate: `python3 -m unittest discover -s tests -v`. A normal no-change
+report means **no matched active service changes**, not guaranteed punctuality.
+
+## Official Renfe train timetables (2026-10-28 correction)
+
+CMTBC train tables differed from Renfe static GTFS by 20–30 minutes on
+28 October 2026. Real-time joins to these older clock times therefore matched
+zero services. `renfe_schedule.py` now replaces only the CMTBC train rows with
+Renfe static GTFS dated departures, retaining CMTBC bus and boat rows.
+
+The existing four weekday buttons show the **nearest corresponding dates**
+from the official Renfe calendar: Mon–Thu, Friday, Saturday, Sunday. Each
+Renfe row displays its exact source service date and links to the official
+Renfe GTFS archive. This does **not** claim that every future weekday has
+identical service; a fully date-based picker would be needed for arbitrary
+future days or holiday exceptions.
+
+GTFS-RT updates match exact `tripId` and `fecha_servicio`. They do not
+guess closest time in the CMTBC table. Only explicitly updated departure and
+arrival times turn green; a delay at another stop is yellow when the shown
+endpoint time has not been verified. Confirmed cancelled trips are red.
+
+If a Renfe static feed cannot be loaded, the former CMTBC train rows stay
+visible **red as unverified**; they must not be silently treated as official
+Renfe times. JSON updates still do not create Git commits.
+
+Diagnostics for each source are included under `meta.renfe_schedule` and the
+service-change report. Tests: `python3 -m unittest discover -s tests -v`.
+
+### Recovery when CMTBC times out during first Renfe migration
+
+The first migration runs `git merge --squash` before requesting CMTBC. A transient
+`siu.cmtbc.es` read timeout can stop the script **with the intended changes
+staged but not committed**. Do **not** repeat `upgrade-renfe-gtfs.sh`, perform
+`git reset --hard`, or run a second squash on top of those staged files.
+
+The recovery entrypoint is `deploy/recover-renfe-gtfs-timeout.sh`. It first
+verifies host, branch and that the Git index has exactly the tree of the
+previously fetched feature snapshot (`37d6d776`). Any unrelated changes cause
+it to stop rather than overwrite. It stops the refresh timer, waits for an
+in-flight service, applies only the reviewed delta, runs tests and generation,
+checks both Renfe schedule feeds, creates a single code commit, publishes the
+HTML/JSON atomically and restarts the timer. The original public site stays
+unchanged if generation fails.
+
+CMTBC network fetches now retry once. If an individual route still cannot be
+retrieved, the last valid public/local JSON is used for **bus/boat only** with
+a visible unverified-source warning and a Telegram diagnostic. Official Renfe
+train data is never restored from stale CMTBC clocks. If no safe cached
+bus/boat route exists, generation fails without publishing a partial timetable.

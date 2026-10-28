@@ -5,6 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import requests
+
 import build_horarios as generator
 
 
@@ -33,6 +35,7 @@ class DynamicJSONTests(unittest.TestCase):
                 patch.object(generator, "fetch", return_value="unused"),
                 patch.object(generator, "parse", return_value=([SAMPLE.copy()], [])),
                 patch.object(generator, "report_issues"),
+                patch.object(generator, "replace_ctan_trains", return_value=([], {})),
                 patch.object(generator, "apply_changes", return_value={
                     "date": "2026-10-28",
                     "checked_at": "2026-10-28T20:00:00+01:00",
@@ -47,6 +50,63 @@ class DynamicJSONTests(unittest.TestCase):
                 self.assertIn("puerto-cadiz", payload["data"])
                 self.assertEqual(payload["data"]["puerto-cadiz"][0]["salida"], "10:00")
                 self.assertEqual(payload["meta"]["changes"], 0)
+
+    def test_consorcio_timeout_retries_once(self):
+        class Response:
+            text = "cached schedule replaced by network"
+            def raise_for_status(self):
+                return None
+        with (
+            patch.object(generator.requests, "get", side_effect=[
+                requests.Timeout("slow"), Response()
+            ]) as get,
+            patch.object(generator.time, "sleep") as sleep,
+        ):
+            self.assertEqual(generator.fetch("https://example.invalid"), Response.text)
+            self.assertEqual(get.call_count, 2)
+            sleep.assert_called_once_with(2)
+
+    def test_cached_bus_and_boat_marked_unverified(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "transport_data.json"
+            cache.write_text(json.dumps({"data": {
+                "puerto-cadiz": [
+                    {"tipo": "bus", "linea": "M-051", "salida": "09:00",
+                     "llegada": "10:00", "dias": "L-V", "aviso": ""},
+                    {"tipo": "catamaran", "linea": "B-042", "salida": "09:00",
+                     "llegada": "09:30", "dias": "L-V", "aviso": ""},
+                    SAMPLE.copy(),
+                ]
+            }}), encoding="utf-8")
+            with patch.object(generator, "DATA_OUTPUT", cache):
+                rows = generator.cached_ctan_route("puerto-cadiz")
+            self.assertEqual([row["tipo"] for row in rows], ["bus", "catamaran"])
+            self.assertTrue(all("no verificado" in row["aviso"] for row in rows))
+
+    def test_unavailable_consorcio_reuses_last_public_data_with_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            json_file = Path(tmp) / "transport_data.json"
+            old = {"tipo": "bus", "linea": "M-051", "salida": "09:00",
+                   "llegada": "10:00", "dias": "L-V", "aviso": ""}
+            json_file.write_text(json.dumps({"data": {"puerto-cadiz": [old]}}),
+                                 encoding="utf-8")
+            with (
+                patch.object(generator, "ROUTES", [("puerto", "cadiz")]),
+                patch.object(generator, "fetch", side_effect=requests.Timeout("upstream")),
+                patch.object(generator, "DATA_OUTPUT", json_file),
+                patch.object(generator, "report_issues") as report,
+                patch.object(generator, "replace_ctan_trains", return_value=([], {})),
+                patch.object(generator, "apply_changes", return_value={
+                    "date": "2026-10-28",
+                    "checked_at": "2026-10-28T20:00:00+01:00",
+                    "issues": 0, "changes": 0,
+                }),
+            ):
+                generator.build(data_only=True)
+            data = json.loads(json_file.read_text(encoding="utf-8"))["data"]
+            self.assertEqual(data["puerto-cadiz"][0]["salida"], "09:00")
+            self.assertIn("no verificado", data["puerto-cadiz"][0]["aviso"])
+            self.assertTrue(report.called)
 
     def test_html_shell_fetches_dynamic_json(self):
         self.assertIn('fetch("./transport_data.json",{cache:"no-store"})', generator.HTML)

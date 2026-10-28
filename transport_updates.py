@@ -88,39 +88,107 @@ def local_day(epoch):
     return datetime.fromtimestamp(epoch, MADRID).date()
 
 
-def unique_matching_trip(data, code, stops, now):
-    """Require both station stop updates, not a guessed train number or direction.
+def _hhmm(value):
+    """Normalize GTFS HH:MM:SS and 24+ hour times to the display clock."""
+    try:
+        hour, minute = (int(x) for x in value.split(":")[:2])
+        if hour < 0 or minute not in range(60):
+            return None
+        return "{:02d}:{:02d}".format(hour % 24, minute)
+    except (ValueError, AttributeError, TypeError):
+        return None
 
-    A CTAN row has no Renfe trip_id. Matching only an origin clock time could
-    attribute the update to another train, so ambiguous updates stay untouched.
+
+def _minutes(hhmm):
+    parts = hhmm.split(":")
+    return int(parts[0]) * 60 + int(parts[1])
+
+
+def _close_clock(a, b):
+    """A 1-minute rounding allowance; never use a broad nearest-train guess."""
+    if a is None or b is None:
+        return False
+    diff = abs(_minutes(a) - _minutes(b))
+    return min(diff, 1440 - diff) <= 1
+
+
+def static_trip_matches(data, code, static_trip, now, trip_id):
+    """Only rows generated from this exact, date-valid Renfe GTFS trip qualify.
+
+    Old CMTBC train times may differ by 20-30 minutes. They must never be
+    matched by nearest clock time, even when the real-time trip looks similar.
     """
-    candidates = []
+    stops = {x["stop_id"]: x for x in static_trip["stops"]}
+    result = []
     for route, trips in data.items():
         origin, destination = route.split("-")
         first = stops.get(STATIONS[origin])
         last = stops.get(STATIONS[destination])
-        if not first or not last:
+        if not first or not last or first["seq"] >= last["seq"]:
             continue
-        dep, arr = stop_event(first, "departure"), stop_event(last, "arrival")
-        if not dep or not arr or local_day(dep[0]) != now.date() or local_day(arr[0]) != now.date():
-            continue
-        for trip in trips:
-            if trip["linea"] != code or not runs_today(trip["dias"], now):
-                continue
-            if local_hhmm(dep[0]) != trip["salida"] or local_hhmm(arr[0]) != trip["llegada"]:
-                continue
-            candidates.append((route, trip, dep, arr, first, last))
-    # Multiple city-pair views of the same physical train are allowed.
-    # Multiple trips in the same pair with identical schedule are not.
-    if len({route for route, *_ in candidates}) != len(candidates):
-        return []
-    return candidates
+        matches = [trip for trip in trips
+                   if trip["linea"] == code and trip.get("trip_id") == trip_id
+                   and trip.get("fecha_servicio") == now.date().isoformat()
+                   and _close_clock(_hhmm(first["departure"]), trip["salida"])
+                   and _close_clock(_hhmm(last["arrival"]), trip["llegada"])]
+        if len(matches) == 1:
+            result.append((route, matches[0], first, last))
+    return result
 
 
-def rail_changes(data, now, session=None, statistics=None):
+def _prediction(stop_update, kind, scheduled, now):
+    """Use only the actual arrival/departure field at this precise station.
+
+    Not even a plausible delay should be silently extrapolated to another
+    station. That gets a yellow 'verify' annotation rather than a green hour.
+    """
+    if not stop_update:
+        return None
+    event = stop_update.get(kind)
+    if not isinstance(event, dict):
+        return None
+    if "time" in event:
+        try:
+            actual = datetime.fromtimestamp(int(event["time"]), MADRID)
+            if actual.date() != now.date():
+                return None
+            predicted = actual.strftime("%H:%M")
+            # Guard broken data such as a previous-day MD trip resurfacing today.
+            if scheduled is None or min(abs(_minutes(predicted) - _minutes(scheduled)),
+                                        1440 - abs(_minutes(predicted) - _minutes(scheduled))) > 180:
+                return None
+            return predicted
+        except (OverflowError, ValueError, TypeError):
+            return None
+    if "delay" in event and scheduled:
+        try:
+            delay = int(event["delay"])
+            if abs(delay) > 3 * 3600:
+                return None
+            mins = (_minutes(scheduled) + round(delay / 60)) % 1440
+            return "{:02d}:{:02d}".format(mins // 60, mins % 60)
+        except (ValueError, TypeError):
+            pass
+    return None
+
+
+def _in_segment(updates, first, last):
+    """Any update explicitly located at a station within our GTFS segment."""
+    positions = {x["stop_id"]: x["seq"] for x in (first, last)}
+    # For an intermediate station in the three-city subset the position will
+    # be checked against the full local GTFS stop list by the caller.
+    return any(str(x.get("stopId")) in positions for x in updates)
+
+
+def rail_changes(data, now, session=None, statistics=None, index_loader=None):
+    """Apply only date-valid, uniquely identified GTFS-RT updates to CTAN rows."""
+    from renfe_static_gtfs import load_index, service_active
+
     events, problems = [], []
+    loader = index_loader or load_index
     for code, url in RENFE.items():
-        counters = {"entities": 0, "station_pairs": 0, "matched_trips": 0, "changes": 0}
+        counters = {"entities": 0, "gtfs_ids": 0, "today_ids": 0,
+                    "matched_trips": 0, "changes": 0, "advisories": 0}
         if statistics is not None:
             statistics[code] = counters
         try:
@@ -128,52 +196,97 @@ def rail_changes(data, now, session=None, statistics=None):
             if not fresh_feed(feed, now):
                 raise ValueError("feed timestamp is stale or in the future")
         except (ValueError, KeyError, TypeError, requests.RequestException) as exc:
-            problems.append("Renfe {}: {}".format(code, exc))
+            problems.append("Renfe {} RT: {}".format(code, exc))
             continue
+
         counters["entities"] = len(feed["entity"])
+        try:
+            index, cache_warning = loader(code, now)
+            if cache_warning:
+                problems.append(cache_warning)
+        except (RuntimeError, OSError, ValueError, KeyError) as exc:
+            problems.append("Renfe {} static GTFS: {}".format(code, exc))
+            continue
+
         for entity in feed["entity"]:
             update = entity.get("tripUpdate")
             if not isinstance(update, dict):
                 continue
             descriptor = update.get("trip", {})
-            relationship = descriptor.get("scheduleRelationship", "SCHEDULED")
-            # Cancellations without stop events cannot be safely tied to a CTAN row.
-            stops = {
-                str(x.get("stopId")): x
-                for x in update.get("stopTimeUpdate", [])
-                if isinstance(x, dict) and str(x.get("stopId")) in STATIONS.values()
-            }
-            if len(stops) < 2:
+            trip_id = str(descriptor.get("tripId") or "")
+            static_trip = index.get("trips", {}).get(trip_id)
+            if not static_trip:
                 continue
-            counters["station_pairs"] += 1
-            matched = unique_matching_trip(data, code, stops, now)
-            counters["matched_trips"] += len(matched)
-            for route, trip, departure, arrival, first, last in matched:
-                source_id = str(descriptor.get("tripId") or entity.get("id"))
+            counters["gtfs_ids"] += 1
+            start_date = descriptor.get("startDate")
+            if start_date and start_date != now.strftime("%Y%m%d"):
+                continue
+            if not service_active(index, trip_id, now.date()):
+                continue
+            counters["today_ids"] += 1
+
+            relationship = descriptor.get("scheduleRelationship", "SCHEDULED")
+            if relationship not in ("SCHEDULED", "CANCELED"):
+                continue
+
+            matches = static_trip_matches(data, code, static_trip, now, trip_id)
+            if not matches:
+                continue
+            counters["matched_trips"] += len(matches)
+            updates = [x for x in update.get("stopTimeUpdate", [])
+                       if isinstance(x, dict)]
+            by_stop = {str(x.get("stopId")): x for x in updates if x.get("stopId")}
+            local_positions = {x["stop_id"]: x["seq"] for x in static_trip["stops"]}
+            for route, trip, first, last in matches:
+                start = by_stop.get(first["stop_id"])
+                finish = by_stop.get(last["stop_id"])
                 skipped = any(
-                    x.get("scheduleRelationship") == "SKIPPED" for x in (first, last))
+                    u and u.get("scheduleRelationship") == "SKIPPED"
+                    for u in (start, finish))
                 cancelled = relationship == "CANCELED" or skipped
-                new_departure, new_arrival = local_hhmm(departure[1]), local_hhmm(arrival[1])
-                if not cancelled and new_departure == trip["salida"] and new_arrival == trip["llegada"]:
+                actual_departure = _prediction(start, "departure",
+                                               _hhmm(first["departure"]), now)
+                actual_arrival = _prediction(finish, "arrival",
+                                             _hhmm(last["arrival"]), now)
+
+                changed_departure = actual_departure and actual_departure != trip["salida"]
+                changed_arrival = actual_arrival and actual_arrival != trip["llegada"]
+                relevant = any(
+                    first["seq"] <= local_positions.get(str(x.get("stopId")), -1) <= last["seq"]
+                    for x in updates)
+                delayed = any(
+                    first["seq"] <= local_positions.get(str(x.get("stopId")), -1) <= last["seq"]
+                    and abs(int(event.get("delay", 0))) >= 60
+                    for x in updates
+                    for event in (x.get("arrival"), x.get("departure"))
+                    if isinstance(event, dict)
+                )
+                if cancelled:
+                    status = "cancelled"
+                    detail = "Renfe: servicio cancelado o parada suprimida"
+                elif changed_departure or changed_arrival:
+                    status = "confirmed"
+                    revised_dep = actual_departure if changed_departure else trip["salida"]
+                    revised_arr = actual_arrival if changed_arrival else trip["llegada"]
+                    detail = "Renfe: {} → {} (previsto {} → {})".format(
+                        revised_dep, revised_arr, trip["salida"], trip["llegada"])
+                elif delayed and relevant:
+                    status = "warning"
+                    detail = "Renfe: retraso comunicado en una parada del trayecto; horario pendiente de confirmar"
+                else:
                     continue
-                status = "cancelled" if cancelled else "confirmed"
-                detail = (
-                    "Renfe: servicio cancelado o parada suprimida"
-                    if cancelled else
-                    "Renfe: {} → {} (previsto {} → {})".format(
-                        new_departure, new_arrival, trip["salida"], trip["llegada"]))
+
                 trip.update({
                     "estado": status, "detalle": detail, "fuente_cambio": url,
-                    "fecha_cambio": now.date().isoformat(),
-                    "trip_id": source_id,
+                    "fecha_cambio": now.date().isoformat(), "trip_id": trip_id,
                 })
-                if not cancelled:
-                    trip["salida_actual"] = new_departure
-                    trip["llegada_actual"] = new_arrival
-                counters["changes"] += 1
+                if changed_departure:
+                    trip["salida_actual"] = actual_departure
+                if changed_arrival:
+                    trip["llegada_actual"] = actual_arrival
+                counters["changes" if status != "warning" else "advisories"] += 1
                 events.append({
-                    "id": "rail:{}:{}:{}:{}:{}".format(
-                        now.date().isoformat(), route, code, trip["salida"], trip["dias"]),
+                    "id": "rail:{}:{}:{}".format(now.date().isoformat(), route, trip_id),
                     "route": route, "line": code, "detail": detail, "source": url,
                     "date": now.date().isoformat(),
                 })
