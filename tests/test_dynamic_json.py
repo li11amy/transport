@@ -33,6 +33,7 @@ class DynamicJSONTests(unittest.TestCase):
                 patch.object(generator, "fetch", return_value="unused"),
                 patch.object(generator, "parse", return_value=([SAMPLE.copy()], [])),
                 patch.object(generator, "report_issues"),
+                patch.object(generator, "replace_ctan_trains", return_value=([], {})),
                 patch.object(generator, "apply_changes", return_value={
                     "date": "2026-10-28",
                     "checked_at": "2026-10-28T20:00:00+01:00",
