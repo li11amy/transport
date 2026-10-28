@@ -24,6 +24,13 @@ with tempfile.TemporaryDirectory() as directory:
             if tid in index["trips"]:
                 join.append(tid)
         current = [tid for tid in join if service_active(index, tid, now.date())]
+        print("SAMPLE ACTIVE CALENDARS:", json.dumps([{
+            "trip_id": tid,
+            "service": index["trips"][tid]["service"],
+            "calendar": index["calendars"].get(index["trips"][tid]["service"]),
+            "exception_today": index["exceptions"].get(
+                index["trips"][tid]["service"], {}).get(now.strftime("%Y%m%d")),
+        } for tid in join[:4]], ensure_ascii=False), flush=True)
         print(json.dumps({
             "line": line,
             "fresh": fresh_feed(feed, now),
