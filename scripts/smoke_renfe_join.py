@@ -10,7 +10,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from renfe_static_gtfs import load_index, service_active
-from transport_updates import RENFE, fetch_json, fresh_feed, static_trip_matches
+from transport_updates import RENFE, fetch_json, fresh_feed, static_trip_matches, _hhmm, STATIONS
 
 now = datetime.now(ZoneInfo("Europe/Madrid"))
 try:
@@ -32,6 +32,30 @@ with tempfile.TemporaryDirectory() as directory:
             if tid in index["trips"]:
                 join.append(tid)
         current = [tid for tid in join if service_active(index, tid, now.date())]
+        diagnostic_examples = []
+        for tid in current[:5]:
+            static = index["trips"][tid]
+            stops = {x["stop_id"]: x for x in static["stops"]}
+            for route, rows in ctan.items():
+                a, b = route.split("-")
+                left, right = stops.get(STATIONS[a]), stops.get(STATIONS[b])
+                if not left or not right or left["seq"] >= right["seq"]:
+                    continue
+                source_dep, source_arr = _hhmm(left["departure"]), _hhmm(right["arrival"])
+                suitable = [r for r in rows if r["linea"] == line]
+                def dist(t1, t2):
+                    if not t1 or not t2: return 999
+                    p = [int(x) for x in t1.split(":")]
+                    q = [int(x) for x in t2.split(":")]
+                    return abs((p[0]*60+p[1])-(q[0]*60+q[1]))
+                nearest = sorted(suitable, key=lambda r:
+                    dist(r["salida"], source_dep) + dist(r["llegada"], source_arr))[:2]
+                diagnostic_examples.append({
+                    "id": tid, "route": route, "gtfs": [source_dep,source_arr],
+                    "ctan_closest": [[r["salida"],r["llegada"],r["dias"]] for r in nearest]
+                })
+        print("CTAN JOIN SAMPLES:",json.dumps(diagnostic_examples[:20],
+                                           ensure_ascii=False),flush=True)
         print("SAMPLE ACTIVE CALENDARS:", json.dumps([{
             "trip_id": tid,
             "service": index["trips"][tid]["service"],
