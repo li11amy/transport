@@ -62,7 +62,7 @@ On the user's Android phone, Squoosh and Bottle Butler were installable but this
 ## Service changes (proposed, review before merging)
 
 The timetable remains the **planned** source data from CMTBC. New
-\`transport_updates.py\` checks the line-specific notices published by CMTBC
+`transport_updates.py` checks the line-specific notices published by CMTBC
 (including boat B-042), and the official Renfe GTFS-RT trip updates:
 - Cercanías: https://gtfsrt.renfe.com/trip_updates.json
 - Media Distancia/LD: https://gtfsrt.renfe.com/trip_updates_LD.json
@@ -74,8 +74,8 @@ Notices about fares do not produce service flags.
 
 **Green:** only when the Renfe realtime feed is fresh (<10 minutes) and
 **both** station stop updates identify an exact, unambiguous scheduled CMTBC
-train on today's date. The original times remain in \`salida\` / \`llegada\`;
-the new times are in \`salida_actual\` / \`llegada_actual\`.
+train on today's date. The original times remain in `salida` / `llegada`;
+the new times are in `salida_actual` / `llegada_actual`.
 Unmatched trip IDs, one-station updates, and newly added trains without
 matching schedule data are **not** automatically inserted. They require
 a GTFS static trip-ID crosswalk before safe automatic adoption.
@@ -87,34 +87,34 @@ Service markers apply only to the date of the update and the corresponding
 day group in the UI. Rail corrections disappear from view when the generated
 feed check is older than 45 minutes. Do not interpret an uncolored train as
 confirmed on time. Missing or stale feeds leave the planned schedule intact;
-diagnostics go to \`output/service_change_report.json\`.
+diagnostics go to `output/service_change_report.json`.
 
-Telegram uses the existing \`TELEGRAM_BOT_TOKEN\`, \`TELEGRAM_CHAT_ID\`, and
-optional \`TELEGRAM_TOPIC_ID\`. Alerts are deduplicated in
-\`output/service_change_notifications.json\`; no tokens or secrets are
+Telegram uses the existing `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and
+optional `TELEGRAM_TOPIC_ID`. Alerts are deduplicated in
+`output/service_change_notifications.json`; no tokens or secrets are
 committed. One bus news item generates one message for that line, not one
 message per scheduled departure.
 
 Tests (network-free):
-\`\`\`bash
+```bash
 python3 -m pip install requests beautifulsoup4
 python3 -m unittest discover -s tests -v
 python3 -m compileall -q build_horarios.py transport_updates.py
-\`\`\`
+```
 
 **Important:** the existing VPS timer only runs at 06:00, and GitHub Pages is
-static. After reviewing and merging this branch into \`main\`, optionally
+static. After reviewing and merging this branch into `main`, optionally
 install the supplied timer override to check changes every 15 minutes:
 
-\`\`\`bash
+```bash
 cd /home/ubuntu/Sites/transport
 sudo install -D -m 644 deploy/transport-update-interval.conf \
   /etc/systemd/system/transport-update.timer.d/override.conf
 sudo systemctl daemon-reload
 sudo systemctl restart transport-update.timer
 systemctl list-timers transport-update.timer
-\`\`\`
+```
 
-This reuses the existing \`transport-update.service\` and update script.
+This reuses the existing `transport-update.service` and update script.
 Frequent runs may produce frequent GitHub Pages commits. No service
 configuration or production site changes until the operator installs it.
