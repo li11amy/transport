@@ -423,4 +423,5 @@ def apply_changes(data, sender, now=None, session=None):
     for error in report["problems"]:
         print("Service update source: " + error, flush=True)
     return {"date": report["today"], "checked_at": report["checked_at"],
-            "issues": len(report["problems"]), "changes": len(unique)}
+            "issues": len(report["problems"]), "changes": len(unique),
+            "maritime": statistics.get("MARITIME_B042", {"status": "unknown"})}
