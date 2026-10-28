@@ -1,0 +1,4 @@
+# Generated output and local warning/alert state
+output/
+__pycache__/
+*.pyc
