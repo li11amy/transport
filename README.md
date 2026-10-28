@@ -73,10 +73,10 @@ that line for *today* get a review marker, with the link to the source.
 Notices about fares do not produce service flags.
 
 **Green:** only when the Renfe realtime feed is fresh (<10 minutes) and
-**both** station stop updates identify an exact, unambiguous scheduled CMTBC
-train on today's date. The original times remain in `salida` / `llegada`;
+the Renfe `tripId` joins an active GTFS service, direction and both
+scheduled CMTBC times for today's date. The original times remain in `salida` / `llegada`;
 the new times are in `salida_actual` / `llegada_actual`.
-Unmatched trip IDs, one-station updates, and newly added trains without
+Unmatched trip IDs and newly added trains without
 matching schedule data are **not** automatically inserted. They require
 a GTFS static trip-ID crosswalk before safe automatic adoption.
 
@@ -194,3 +194,30 @@ must **not** move every 15 minutes. The JSON report's `events: []` means
 *no matched changes*, not proof that there were no disruptions. Confirm
 matching against a real Renfe update before trusting the green status
 completely.
+
+## Renfe one-stop realtime join (2026-10-28)
+
+Previous logic required both station updates in a single realtime entity. Live
+Renfe feeds predominantly provide only one stop per train; this produced 0
+matches even though static `trip_id` matches exist (C-1: 247/317; MD: 271/283
+in the diagnostic snapshot). The new `renfe_static_gtfs.py` downloads Renfe
+GTFS once daily and caches a compact index of trains that serve Jerez,
+El Puerto or Cádiz in `output/gtfs_cache/` (ignored by Git).
+
+- Identify the train by exact `tripId`, active service calendar and today,
+  direction (ordered GTFS stops) and *both* CMTBC planned endpoint times.
+- Only modify an endpoint time when that specific **arrival or departure**
+  is explicitly provided. Do **not** extrapolate one stop to another.
+- If a station inside the segment reports a delay but the endpoint timing is
+  unverified, show a yellow warning instead of fabricating a green time.
+- Previous-day MD services (date in `tripId`), stale feeds, implausibly large
+  time differences, and unknown calendar services cannot override the schedule.
+- A matching, date-valid cancellation may mark a trip red, including when the
+  GTFS-RT cancellation does not provide individual station updates.
+- Daily static GTFS failures are reported. A prior compact index may be used
+  for up to 48 hours, with a diagnostic warning; otherwise no updates apply.
+- Diagnostics now include `gtfs_ids`, `today_ids`, `matched_trips`,
+  `changes` and `advisories` per Renfe feed.
+
+Validate: `python3 -m unittest discover -s tests -v`. A normal no-change
+report means **no matched active service changes**, not guaranteed punctuality.
