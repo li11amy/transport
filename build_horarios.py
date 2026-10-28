@@ -254,21 +254,23 @@ td:nth-child(3){font-size:14px;color:#444}
 .small{display:block;color:#777;font-size:10px;line-height:1.25;margin-top:3px;max-width:160px;overflow-wrap:anywhere}
 .empty-note{text-align:center;color:#666;font-size:14px;padding:18px 0}
 .source-note{font-size:12px;color:#777;line-height:1.5;margin-top:12px}
-.warning-banner{background:#fff0f0;border:1px solid #d34545;color:#a41515;border-radius:11px;padding:10px 12px;font-size:13px;line-height:1.4;margin-bottom:10px}
-tr.uncertain{background:#fff0f0}
-tr.uncertain td:nth-child(3){color:#b91c1c;font-weight:650}
-.uncertain .day-warning{display:block;color:#b91c1c;font-size:11px;font-weight:650}
-tr.service-warning{background:#fff7e3}
-tr.service-warning td:nth-child(3){color:#875300}
-tr.service-confirmed{background:#e8f7ee}
-tr.service-confirmed td:nth-child(3){color:#176c3c}
-tr.service-cancelled{background:#fff0f0}
-tr.service-cancelled td:nth-child(3){color:#b91c1c;font-weight:650}
-.service-detail{display:block;font-size:11px;line-height:1.35;margin-top:4px;font-weight:normal}
-.service-warning .service-detail{color:#875300}
-.service-confirmed .service-detail{color:#176c3c}
-.service-cancelled .service-detail{color:#b91c1c}
-.service-planned{text-decoration:line-through;color:#888;font-size:11px;margin-left:3px}
+.reference-date{font-size:12px;color:#6b7280;margin-top:-4px;margin-bottom:2px}
+.reference-date[hidden],.status-legend[hidden],.trip-extra[hidden]{display:none}
+.status-legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:0 1px 10px;font-size:12px;color:#5c626a}
+.status-legend span{display:inline-flex;align-items:center;gap:5px}
+.status-dot{display:inline-block;width:11px;height:11px;border-radius:3px}
+.status-dot.cancelled{background:#f1a3a3}
+.status-dot.changed{background:#eac565}
+tr.uncertain,tr.service-warning,tr.service-confirmed{background:#fff3d1}
+tr.service-cancelled{background:#ffe5e5}
+tr.service-cancelled td:nth-child(3){color:#a72121;font-weight:650}
+tr.trip-expandable{cursor:pointer}
+tr.trip-expandable:focus-visible{outline:2px solid #1f4fa8;outline-offset:-2px}
+.trip-info{color:#6b7280;font-size:12px;margin-left:5px;font-weight:normal}
+.trip-extra td{padding:10px 12px;background:#fffaf1;color:#5f4d21;text-align:left;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.trip-extra.cancelled td{background:#fff2f2;color:#8b2323}
+.trip-extra a{display:inline-block;margin-left:8px}
+
 a{color:#1f4fa8}
 .offline-notice[hidden]{display:none}
 .offline-notice{background:#fff6e5;color:#804600;border:1px solid #e8c37b;border-radius:10px;padding:9px 12px;margin-bottom:11px;font-size:13px;line-height:1.4}
@@ -303,8 +305,13 @@ a{color:#1f4fa8}
     <button type="button" class="filter-chip active" data-type="bus">🚌 Bus</button>
     <button type="button" class="filter-chip active" data-type="tren">🚆 Tren</button>
   </div>
+  <div id="trainReference" class="reference-date" hidden></div>
 </div>
-<div id="warningSummary" class="warning-banner" role="alert" hidden></div>
+<div id="warningSummary" class="status-legend" aria-label="Leyenda de cambios" hidden>
+  <span><i class="status-dot cancelled" aria-hidden="true"></i>Cancelado</span>
+  <span><i class="status-dot changed" aria-hidden="true"></i>Cambios o pendiente de comprobar</span>
+  <span>ⓘ Toca la fila para detalles</span>
+</div>
 <div class="section">
  <table><thead><tr><th>Salida</th><th>Llegada</th><th>Línea</th></tr></thead><tbody id="schedule"></tbody></table>
  <div class="empty-note" id="empty" hidden>No hay servicios para los filtros elegidos.</div>
@@ -405,56 +412,84 @@ function update() {
     const bt=currentServiceStatus(b)==="confirmed"?(b.salida_actual||b.salida):b.salida;
     return at.localeCompare(bt)||a.linea.localeCompare(b.linea);
   });
-  const warnings=trips.filter(t=>t.aviso||["warning","cancelled"].includes(currentServiceStatus(t)));
-  const banner=document.getElementById("warningSummary");
-  banner.hidden=warnings.length===0;
-  banner.textContent=warnings.length
-      ? "Atención: "+warnings.length+" servicio(s) requieren comprobación. Consulta la fuente del aviso."
-      : "";
+  const flags=trips.filter(t=>t.aviso||currentServiceStatus(t));
+  document.getElementById("warningSummary").hidden=flags.length===0;
+  const reference=document.getElementById("trainReference");
+  const dates=[...new Set(trips.filter(t=>t.tipo==="tren"&&t.fecha_servicio)
+    .map(t=>t.fecha_servicio))].sort();
+  reference.hidden=dates.length===0;
+  reference.textContent=dates.length
+    ? "Trenes Renfe · "+dates.map(d=>d.split("-").reverse().join("/")).join(", ")
+    : "";
   body.replaceChildren();
   const fragment=document.createDocumentFragment();
   for(const t of trips) {
     const tr=document.createElement("tr");
     const status=currentServiceStatus(t);
-    if(t.aviso){ tr.classList.add("uncertain"); tr.title=t.aviso; }
-    if(status) tr.classList.add("service-"+status);
+    const marked=Boolean(status||t.aviso);
+    const cancelled=status==="cancelled";
+    if(cancelled) tr.classList.add("service-cancelled");
+    else if(marked) tr.classList.add("service-warning");
     const actual=status==="confirmed";
-    const dep=tdWithStop(actual&&t.salida_actual?t.salida_actual:t.salida,t.parada_salida,fromCity,t.tipo);
-    const arr=tdWithStop(actual&&t.llegada_actual?t.llegada_actual:t.llegada,toCity,t.tipo,t.llegada_estimada&&!actual);
-    if(actual&&t.salida_actual&&t.salida_actual!==t.salida) {
-      const old=document.createElement("span");old.className="service-planned";old.textContent=t.salida;dep.appendChild(old);
-    }
-    if(actual&&t.llegada_actual&&t.llegada_actual!==t.llegada) {
-      const old=document.createElement("span");old.className="service-planned";old.textContent=t.llegada;arr.appendChild(old);
-    }
+    const dep=tdWithStop(actual&&t.salida_actual?t.salida_actual:t.salida,
+      t.parada_salida,fromCity,t.tipo);
+    const arr=tdWithStop(actual&&t.llegada_actual?t.llegada_actual:t.llegada,
+      t.parada_llegada,toCity,t.tipo,t.llegada_estimada&&!actual);
     tr.appendChild(dep);
     tr.appendChild(arr);
     const line=document.createElement("td");
     line.appendChild(document.createTextNode(t.linea));
-    const small=document.createElement("small");
-    small.className="small";
-    small.textContent=t.aviso ? "⚠ "+(t.dias||"?") : t.dias;
-    if(t.aviso) {small.classList.add("day-warning"); small.title=t.aviso;}
-    line.appendChild(small);
-    if(t.tipo==="tren" && t.fecha_servicio) {
-      const dateLabel=document.createElement("small");
-      dateLabel.className="small";
-      dateLabel.textContent="Renfe · "+t.fecha_servicio.split("-").reverse().join("/");
-      line.appendChild(dateLabel);
+    if(t.tipo!=="tren") {
+      const small=document.createElement("small");
+      small.className="small";
+      small.textContent=t.dias||"?";
+      line.appendChild(small);
     }
-    if(status) {
-      const detail=document.createElement("small");
-      detail.className="service-detail";
-      detail.textContent=(status==="confirmed"?"Confirmado · ":status==="cancelled"?"Cancelado · ":"Revisar · ")+(t.detalle||"");
-      line.appendChild(detail);
-      if(t.fuente_cambio) {
-        const link=document.createElement("a");
-        link.textContent="Fuente";link.href=t.fuente_cambio;link.target="_blank";link.rel="noopener noreferrer";
-        link.className="service-detail";line.appendChild(link);
-      }
+    if(marked) {
+      const info=document.createElement("span");
+      info.className="trip-info";
+      info.textContent="ⓘ";
+      info.setAttribute("aria-hidden","true");
+      line.appendChild(info);
     }
     tr.appendChild(line);
     fragment.appendChild(tr);
+    if(marked) {
+      const extra=document.createElement("tr");
+      extra.className="trip-extra"+(cancelled?" cancelled":"");
+      extra.hidden=true;
+      const details=document.createElement("td");
+      details.colSpan=3;
+      const message=document.createElement("span");
+      message.textContent=t.detalle||t.aviso||
+        (cancelled?"Servicio cancelado.":"Comprueba este servicio antes de viajar.");
+      details.appendChild(message);
+      if(t.fuente_cambio) {
+        const source=document.createElement("a");
+        source.href=t.fuente_cambio;
+        source.target="_blank";
+        source.rel="noopener noreferrer";
+        source.textContent="Fuente";
+        details.appendChild(source);
+      }
+      extra.appendChild(details);
+      fragment.appendChild(extra);
+      tr.classList.add("trip-expandable");
+      tr.tabIndex=0;
+      tr.setAttribute("aria-expanded","false");
+      tr.setAttribute("aria-label",t.linea+": "+(cancelled?"cancelado":"cambios o aviso")+". Ver detalles");
+      const toggle=()=>{
+        extra.hidden=!extra.hidden;
+        tr.setAttribute("aria-expanded",String(!extra.hidden));
+      };
+      tr.addEventListener("click",toggle);
+      tr.addEventListener("keydown",event=>{
+        if(event.key==="Enter"||event.key===" ") {
+          event.preventDefault();
+          toggle();
+        }
+      });
+    }
   }
   body.appendChild(fragment);
   document.getElementById("empty").hidden=trips.length>0;
