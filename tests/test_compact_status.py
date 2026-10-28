@@ -5,6 +5,20 @@ from build_horarios import HTML
 
 
 class CompactStatusTests(unittest.TestCase):
+    def test_centered_header_and_install_prompt(self):
+        dom = BeautifulSoup(HTML, "html.parser")
+        self.assertIsNotNone(dom.select_one(".page-heading h1"))
+        self.assertEqual(dom.select_one(".area-label").get_text(strip=True),
+                         "El Puerto · Cádiz · Jerez")
+        self.assertIsNotNone(dom.select_one("#installButton"))
+        self.assertIsNotNone(dom.select_one("#installHelp[hidden]"))
+        self.assertIn('window.addEventListener("beforeinstallprompt"', HTML)
+        self.assertIn('window.addEventListener("appinstalled"', HTML)
+        self.assertIn('const choice=await prompt.prompt()', HTML)
+        self.assertIn('window.matchMedia("(display-mode: standalone)")', HTML)
+        self.assertIn("Añadir a pantalla de inicio", HTML)
+        self.assertIn("h1{font-size:clamp(23px,5vw,26px);margin:4px 0 5px;text-align:center", HTML)
+
     def test_one_legend_and_one_global_train_date(self):
         dom = BeautifulSoup(HTML, "html.parser")
         self.assertEqual(len(dom.select("#warningSummary")), 1)
