@@ -93,7 +93,7 @@ def main():
     if INCLUDE in block:
         print("Nginx transport include already present; no changes made.")
         return
-    if re.search(r"\blocation\s+(?:=|~\*?|\\^~)?\s*/transport(?:/|\s|$)", block):
+    if re.search(r"\blocation\s+[^\{;]*?/transport", block):
         fail("Nginx already contains a /transport location. Inspect it manually.")
 
     snippet_src = Path(__file__).with_name("nginx-transport-location.conf")
