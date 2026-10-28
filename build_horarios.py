@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Transport timetable for El Puerto de Santa María, Cádiz and Jerez.
 Production version from 2026-10-28; based on the CMTBC origin-destination tables.
+Android PWA install analysis: scripts/compare_android_install.cjs.
 """
 import json
 import os
