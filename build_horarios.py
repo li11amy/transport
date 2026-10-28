@@ -215,8 +215,8 @@ HTML = r"""<!doctype html>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Horarios Bahía">
-<link rel="manifest" href="/transport/manifest.json">
-<link rel="icon" href="/transport/icon-192.png" sizes="192x192" type="image/png">
+<link rel="manifest" href="/transport/manifest.json?v=2">
+<link rel="icon" href="/transport/icon-192-rgb.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/transport/icon-180.png">
 <title>Horarios de transporte · Bahía de Cádiz</title>
 <style>
