@@ -357,6 +357,11 @@ function update() {
   updateRouteControls();
   const routeTrips=DATA[key]||[];
   const trips=routeTrips.filter(t=>types.has(t.tipo)&&operates(t.dias));
+  trips.sort((a,b)=>{
+    const at=currentServiceStatus(a)==="confirmed"?(a.salida_actual||a.salida):a.salida;
+    const bt=currentServiceStatus(b)==="confirmed"?(b.salida_actual||b.salida):b.salida;
+    return at.localeCompare(bt)||a.linea.localeCompare(b.linea);
+  });
   const warnings=trips.filter(t=>t.aviso||["warning","cancelled"].includes(currentServiceStatus(t)));
   const banner=document.getElementById("warningSummary");
   banner.hidden=warnings.length===0;
@@ -465,6 +470,10 @@ window.addEventListener("offline",updateConnection);
 window.addEventListener("online",updateConnection);
 updateConnection();
 update();
+// GitHub Pages is static. Periodically load the next published schedule.
+setInterval(()=>{
+  if(document.visibilityState==="visible" && navigator.onLine) window.location.reload();
+}, 15*60*1000);
 </script>
 </body>
 </html>"""
