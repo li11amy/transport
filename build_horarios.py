@@ -296,7 +296,7 @@ a{color:#1f4fa8}
   <h1>Horarios de transporte</h1>
   <div class="page-meta">
     <span class="area-label">El Puerto · Cádiz · Jerez</span>
-    <button type="button" class="install-link" id="installButton">Instalar app</button>
+    <button type="button" class="install-link" id="installButton" hidden>Instalar app</button>
   </div>
   <div class="install-help" id="installHelp" hidden role="status">
     <button type="button" id="closeInstallHelp" aria-label="Cerrar instrucciones">×</button>
@@ -606,7 +606,9 @@ let deferredInstallPrompt=null;
 const installedMode=()=>window.matchMedia("(display-mode: standalone)").matches||
   window.navigator.standalone===true;
 function updateInstallVisibility(){
-  installButton.hidden=installedMode();
+  // Only advertise installation when Chrome actually offers its native prompt.
+  // A browser-only shortcut must not be presented as an installable app.
+  installButton.hidden=installedMode()||!deferredInstallPrompt;
   if(installedMode())installHelp.hidden=true;
 }
 window.addEventListener("beforeinstallprompt",event=>{
