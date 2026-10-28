@@ -31,3 +31,4 @@ jobs:
       - run: python -m py_compile deploy/enable-nginx-transport.py
 
       - run: python scripts/diagnose_renfe_live.py
+      - run: python scripts/diagnose_renfe_gtfs.py
