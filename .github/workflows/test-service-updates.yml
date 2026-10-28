@@ -36,13 +36,13 @@ jobs:
           Path("/tmp/transport-ui.js").write_text(source, encoding="utf-8")
           PY
           node --check /tmp/transport-ui.js
-      - name: Check real Renfe GTFS join (network may be transient)
-        run: PYTHONPATH=. python scripts/smoke_renfe_join.py
-        continue-on-error: true
-      - run: bash -n deploy/*.sh
-      - run: python -m py_compile deploy/enable-nginx-transport.py
       - name: Compare current transport vs Bottle Butler Android PWA installability
         run: |
           npm install --no-save puppeteer-core
           node scripts/compare_android_install.cjs
         continue-on-error: true
+      - name: Check real Renfe GTFS join (network may be transient)
+        run: PYTHONPATH=. python scripts/smoke_renfe_join.py
+        continue-on-error: true
+      - run: bash -n deploy/*.sh
+      - run: python -m py_compile deploy/enable-nginx-transport.py
