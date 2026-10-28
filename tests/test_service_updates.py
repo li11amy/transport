@@ -23,6 +23,8 @@ def trip(line="C-1", kind="tren", departure="10:00", arrival="10:30", days="L-V"
         "dias": days, "aviso": "", "parada_salida": "Estación FC",
         "parada_llegada": "Plaza de Sevilla-Estación de Cádiz",
         "llegada_estimada": False,
+        **({"trip_id": "RENFE_TEST", "fecha_servicio": "2026-10-28"}
+           if kind == "tren" else {}),
     }
 
 
