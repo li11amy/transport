@@ -117,9 +117,12 @@ def unique_matching_trip(data, code, stops, now):
     return candidates
 
 
-def rail_changes(data, now, session=None):
+def rail_changes(data, now, session=None, statistics=None):
     events, problems = [], []
     for code, url in RENFE.items():
+        counters = {"entities": 0, "station_pairs": 0, "matched_trips": 0, "changes": 0}
+        if statistics is not None:
+            statistics[code] = counters
         try:
             feed = fetch_json(url, session)
             if not fresh_feed(feed, now):
@@ -127,6 +130,7 @@ def rail_changes(data, now, session=None):
         except (ValueError, KeyError, TypeError, requests.RequestException) as exc:
             problems.append("Renfe {}: {}".format(code, exc))
             continue
+        counters["entities"] = len(feed["entity"])
         for entity in feed["entity"]:
             update = entity.get("tripUpdate")
             if not isinstance(update, dict):
@@ -141,7 +145,10 @@ def rail_changes(data, now, session=None):
             }
             if len(stops) < 2:
                 continue
-            for route, trip, departure, arrival, first, last in unique_matching_trip(data, code, stops, now):
+            counters["station_pairs"] += 1
+            matched = unique_matching_trip(data, code, stops, now)
+            counters["matched_trips"] += len(matched)
+            for route, trip, departure, arrival, first, last in matched:
                 source_id = str(descriptor.get("tripId") or entity.get("id"))
                 skipped = any(
                     x.get("scheduleRelationship") == "SKIPPED" for x in (first, last))
@@ -163,6 +170,7 @@ def rail_changes(data, now, session=None):
                 if not cancelled:
                     trip["salida_actual"] = new_departure
                     trip["llegada_actual"] = new_arrival
+                counters["changes"] += 1
                 events.append({
                     "id": "rail:{}:{}:{}:{}:{}".format(
                         now.date().isoformat(), route, code, trip["salida"], trip["dias"]),
@@ -172,12 +180,16 @@ def rail_changes(data, now, session=None):
     return events, problems
 
 
-def bus_notices(data, now, session=None):
+def bus_notices(data, now, session=None, statistics=None):
     """Parse line-specific public notices; never infer exact cancelled departures."""
     events, problems = [], []
+    counters = {"lines": 0, "identified": 0, "notices": 0, "warning_lines": 0}
+    if statistics is not None:
+        statistics["CMTBC"] = counters
     http = session or requests
     bus_codes = sorted({trip["linea"] for trips in data.values()
                         for trip in trips if trip["tipo"] in ("bus", "catamaran")})
+    counters["lines"] = len(bus_codes)
     try:
         response = http.get(BUS_LINES_URL, timeout=15)
         response.raise_for_status()
@@ -192,6 +204,7 @@ def bus_notices(data, now, session=None):
                 ids[match.group(1)] = line_id
     except requests.RequestException as exc:
         return events, ["CMTBC list: {}".format(exc)]
+    counters["identified"] = sum(code in ids for code in bus_codes)
     for code in bus_codes:
         if code not in ids:
             problems.append("CMTBC: no line ID for {}".format(code))
@@ -216,6 +229,7 @@ def bus_notices(data, now, session=None):
             if not NOTICE_WORDS.search(title) or NON_SERVICE_WORDS.search(title):
                 continue
             notices.append((published, title, urljoin(url, a["href"])))
+        counters["notices"] += len(notices)
         if not notices:
             continue
         notices.sort(reverse=True)
@@ -233,6 +247,7 @@ def bus_notices(data, now, session=None):
                 })
                 affected_routes.append(route)
         if affected_routes:
+            counters["warning_lines"] += 1
             events.append({
                 "id": "bus:{}:{}".format(code, published.isoformat()),
                 "route": ", ".join(sorted(set(affected_routes))),
@@ -274,14 +289,16 @@ def notify_events(events, sender, now):
 
 def apply_changes(data, sender, now=None, session=None):
     now = date_now(now)
-    rail, rail_problems = rail_changes(data, now, session)
-    bus, bus_problems = bus_notices(data, now, session)
+    statistics = {}
+    rail, rail_problems = rail_changes(data, now, session, statistics)
+    bus, bus_problems = bus_notices(data, now, session, statistics)
     # Avoid 10 Telegram messages for the same advisory repeated in city-pair views.
     unique = {event["id"]: event for event in rail + bus}
     notify_events(list(unique.values()), sender, now)
     report = {
         "checked_at": now.isoformat(timespec="seconds"), "today": now.date().isoformat(),
         "events": list(unique.values()), "problems": rail_problems + bus_problems,
+        "sources": statistics,
     }
     REPORT_FILE.parent.mkdir(parents=True, exist_ok=True)
     REPORT_FILE.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
