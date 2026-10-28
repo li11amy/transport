@@ -29,7 +29,7 @@ def main():
     # Maskable safe-zone: all content is inside central 80% of the canvas,
     # so Android can crop the outside without cutting off the illustration.
     base = flatten("icon-512.png")
-    mask = Image.new("RGB", (512, 512), WHITE)
+    mask = Image.new("RGB", (512, 512), (45, 108, 223))
     logo = base.resize((384, 384), Image.Resampling.LANCZOS)
     mask.paste(logo, (64, 64))
     target = ROOT / "icon-512-maskable.png"
