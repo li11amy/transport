@@ -12,6 +12,8 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
+from transport_updates import apply_changes
+
 BASE_URL = "https://siu.cmtbc.es/es/horarios_origen_destino.php"
 CITIES = {"puerto": (8, "El Puerto"), "cadiz": (1, "Cádiz"), "jerez": (14, "Jerez")}
 ROUTES = [(a, b) for a in CITIES for b in CITIES if a != b]
@@ -213,6 +215,17 @@ td:nth-child(3){font-size:14px;color:#444}
 tr.uncertain{background:#fff0f0}
 tr.uncertain td:nth-child(3){color:#b91c1c;font-weight:650}
 .uncertain .day-warning{display:block;color:#b91c1c;font-size:11px;font-weight:650}
+tr.service-warning{background:#fff7e3}
+tr.service-warning td:nth-child(3){color:#875300}
+tr.service-confirmed{background:#e8f7ee}
+tr.service-confirmed td:nth-child(3){color:#176c3c}
+tr.service-cancelled{background:#fff0f0}
+tr.service-cancelled td:nth-child(3){color:#b91c1c;font-weight:650}
+.service-detail{display:block;font-size:11px;line-height:1.35;margin-top:4px;font-weight:normal}
+.service-warning .service-detail{color:#875300}
+.service-confirmed .service-detail{color:#176c3c}
+.service-cancelled .service-detail{color:#b91c1c}
+.service-planned{text-decoration:line-through;color:#888;font-size:11px;margin-left:3px}
 a{color:#1f4fa8}
 .offline-notice[hidden]{display:none}
 .offline-notice{background:#fff6e5;color:#804600;border:1px solid #e8c37b;border-radius:10px;padding:9px 12px;margin-bottom:11px;font-size:13px;line-height:1.4}
@@ -259,11 +272,25 @@ a{color:#1f4fa8}
  Para días festivos, comprueba las excepciones.
  <a id="source" href="#" target="_blank" rel="noopener noreferrer">Fuente: Consorcio de Transportes</a>.
  <span>Consultado el __UPDATED__.</span>
+ <span id="serviceStatus"></span>
+ <span>Actualizaciones ferroviarias: Renfe (CC BY 4.0).</span>
 </p>
 </main>
 <script>
 "use strict";
 const DATA = __TRANSPORT_DATA__;
+const SERVICE_META = __SERVICE_META__;
+function spanishToday() {
+  return new Intl.DateTimeFormat("sv-SE", {timeZone:"Europe/Madrid",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+}
+function todayGroup() {
+  const weekday=new Intl.DateTimeFormat("en-US",{timeZone:"Europe/Madrid",weekday:"short"}).format(new Date());
+  return weekday==="Fri"?"viernes":weekday==="Sat"?"sabado":weekday==="Sun"?"domingo":"lunes_jueves";
+}
+function currentServiceStatus(t) {
+  return SERVICE_META.date===spanishToday() && day===todayGroup() && t.fecha_cambio===spanishToday()
+      ? (t.estado||"") : "";
+}
 const NAMES = {"puerto":"El Puerto","cadiz":"Cádiz","jerez":"Jerez"};
 const ALLOWED_DAYS = ["L-J","L-V","L-S","L-D","S","D","S-D-F","V"];
 function displayStop(stop, city) {
@@ -284,7 +311,7 @@ const body = document.getElementById("schedule");
 const routeMenu = document.getElementById("routeMenu");
 const routeListBtn = document.getElementById("routeListBtn");
 let fromCity = "puerto", toCity = "cadiz";
-let day = "lunes_jueves";
+let day = todayGroup();
 let types = new Set(["bus","tren","catamaran"]);
 function currentPair() {
   return [fromCity,toCity].sort().join("-");
@@ -327,20 +354,31 @@ function update() {
   const key=fromCity+"-"+toCity;
   updateRouteControls();
   const routeTrips=DATA[key]||[];
-  const warnings=routeTrips.filter(t=>t.aviso);
+  const trips=routeTrips.filter(t=>types.has(t.tipo)&&operates(t.dias));
+  const warnings=trips.filter(t=>t.aviso||["warning","cancelled"].includes(currentServiceStatus(t)));
   const banner=document.getElementById("warningSummary");
   banner.hidden=warnings.length===0;
   banner.textContent=warnings.length
-      ? "⚠ "+warnings.length+" servicio(s) con calendario sin verificar. Se muestran en rojo para revisión."
+      ? "Atención: "+warnings.length+" servicio(s) requieren comprobación. Consulta la fuente del aviso."
       : "";
-  const trips=routeTrips.filter(t=>types.has(t.tipo)&&operates(t.dias));
   body.replaceChildren();
   const fragment=document.createDocumentFragment();
   for(const t of trips) {
     const tr=document.createElement("tr");
+    const status=currentServiceStatus(t);
     if(t.aviso){ tr.classList.add("uncertain"); tr.title=t.aviso; }
-    tr.appendChild(tdWithStop(t.salida,t.parada_salida,fromCity,t.tipo));
-    tr.appendChild(tdWithStop(t.llegada,t.parada_llegada,toCity,t.tipo,t.llegada_estimada));
+    if(status) tr.classList.add("service-"+status);
+    const actual=status==="confirmed";
+    const dep=tdWithStop(actual&&t.salida_actual?t.salida_actual:t.salida,t.parada_salida,fromCity,t.tipo);
+    const arr=tdWithStop(actual&&t.llegada_actual?t.llegada_actual:t.llegada,toCity,t.tipo,t.llegada_estimada&&!actual);
+    if(actual&&t.salida_actual&&t.salida_actual!==t.salida) {
+      const old=document.createElement("span");old.className="service-planned";old.textContent=t.salida;dep.appendChild(old);
+    }
+    if(actual&&t.llegada_actual&&t.llegada_actual!==t.llegada) {
+      const old=document.createElement("span");old.className="service-planned";old.textContent=t.llegada;arr.appendChild(old);
+    }
+    tr.appendChild(dep);
+    tr.appendChild(arr);
     const line=document.createElement("td");
     line.appendChild(document.createTextNode(t.linea));
     const small=document.createElement("small");
@@ -348,6 +386,17 @@ function update() {
     small.textContent=t.aviso ? "⚠ "+(t.dias||"?") : t.dias;
     if(t.aviso) {small.classList.add("day-warning"); small.title=t.aviso;}
     line.appendChild(small);
+    if(status) {
+      const detail=document.createElement("small");
+      detail.className="service-detail";
+      detail.textContent=(status==="confirmed"?"Confirmado · ":status==="cancelled"?"Cancelado · ":"Revisar · ")+(t.detalle||"");
+      line.appendChild(detail);
+      if(t.fuente_cambio) {
+        const link=document.createElement("a");
+        link.textContent="Fuente";link.href=t.fuente_cambio;link.target="_blank";link.rel="noopener noreferrer";
+        link.className="service-detail";line.appendChild(link);
+      }
+    }
     tr.appendChild(line);
     fragment.appendChild(tr);
   }
@@ -396,7 +445,12 @@ document.querySelectorAll(".filter-chip").forEach(btn=>btn.addEventListener("cli
   document.querySelectorAll(".filter-chip").forEach(b=>{const enabled=types.has(b.dataset.type);b.classList.toggle("active",enabled);b.setAttribute("aria-pressed",String(enabled));});
   update();
 }));
+document.querySelectorAll(".day-btn").forEach(b=>b.classList.toggle("active",b.dataset.day===day));
 document.querySelectorAll(".day-btn,.filter-chip").forEach(b=>b.setAttribute("aria-pressed",String(b.classList.contains("active"))));
+const serviceStatus=document.getElementById("serviceStatus");
+serviceStatus.textContent=SERVICE_META.checked_at
+  ? " Cambios comprobados: "+SERVICE_META.checked_at.replace("T"," ").slice(0,16)+" (España)."
+  : " Cambios en tiempo real no disponibles.";
 // PWA setup is part of the generated HTML so each daily update preserves installation.
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/transport/sw.js", {scope:"/transport/"}).catch(e=>console.warn("PWA unavailable",e));
@@ -475,6 +529,11 @@ def build():
         report_issues([{"route": "ERROR", "detail": str(exc)}])
         raise
     report_issues(issues)
+    try:
+        meta = apply_changes(data, notify_telegram)
+    except Exception as exc:
+        print("Service updates unavailable, preserving planned timetable: {}".format(exc), flush=True)
+        meta = {}
     for origin, destination in ROUTES:
         key = origin + "-" + destination
         trips = data[key]
@@ -486,6 +545,7 @@ def build():
             sum(t["tipo"] == "catamaran" for t in trips),
             len(dropped), ", ".join(dropped[:8])), flush=True)
     output = HTML.replace("__TRANSPORT_DATA__", json.dumps(data, ensure_ascii=False).replace("<", "\\u003c"))
+    output = output.replace("__SERVICE_META__", json.dumps(meta, ensure_ascii=False).replace("<", "\\u003c"))
     output = output.replace("__UPDATED__", datetime.now().strftime("%d/%m/%Y"))
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(output, encoding="utf-8")
