@@ -105,6 +105,7 @@ def evaluate_status(data, now, payload):
               "checked_at": observed.isoformat(timespec="seconds"),
               "red": 0, "yellow": 0, "source": PUBLIC_URL}
     changes = []
+    status["messages"] = []
     # A fresh operational maritime status outranks an old headline-only warning.
     for route, trips in data.items():
         if route not in ("cadiz-puerto", "puerto-cadiz"):
@@ -124,6 +125,8 @@ def evaluate_status(data, now, payload):
             r"\b(?:todos los servicios|todas las salidas|suspension total|"
             r"servicio suspendido por completo)\b", fold(text)))
         reason = window.get("causa") or "Suspensión del servicio marítimo"
+        note = BeautifulSoup(unescape(text), "html.parser").get_text(" ", strip=True)
+        status["messages"].append(str(reason) + (": " + note[:380] if note else ""))
         for route, trips in data.items():
             if route not in ("cadiz-puerto", "puerto-cadiz"):
                 continue
@@ -179,10 +182,13 @@ def live_maritime_changes(data, now, session=None, statistics=None):
                 "{} {} ({})".format(route.replace("-", " → "), dep,
                                     "cancelado" if level == "cancelled" else "revisar")
                 for route, dep, level in sorted(set(changes)))
+            reason = "; ".join(result.get("messages", []))
             events.append({
                 "id": "maritime:{}:{}".format(FERRY, now.date().isoformat()),
                 "date": now.date().isoformat(), "route": "Cádiz ↔ El Puerto",
-                "line": FERRY, "detail": summary, "source": PUBLIC_URL,
+                "line": FERRY,
+                "detail": summary + ("\n" + reason if reason else ""),
+                "source": PUBLIC_URL,
             })
         return events, errors
     except (requests.RequestException, ValueError, TypeError, AttributeError, KeyError) as exc:
