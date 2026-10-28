@@ -288,8 +288,10 @@ function todayGroup() {
   return weekday==="Fri"?"viernes":weekday==="Sat"?"sabado":weekday==="Sun"?"domingo":"lunes_jueves";
 }
 function currentServiceStatus(t) {
+  const checked=Date.parse(SERVICE_META.checked_at||"");
+  const feedFresh=Number.isFinite(checked)&&Date.now()>=checked&&Date.now()-checked<=45*60*1000;
   return SERVICE_META.date===spanishToday() && day===todayGroup() && t.fecha_cambio===spanishToday()
-      ? (t.estado||"") : "";
+      && (t.tipo!=="tren"||feedFresh) ? (t.estado||"") : "";
 }
 const NAMES = {"puerto":"El Puerto","cadiz":"Cádiz","jerez":"Jerez"};
 const ALLOWED_DAYS = ["L-J","L-V","L-S","L-D","S","D","S-D-F","V"];
@@ -449,7 +451,7 @@ document.querySelectorAll(".day-btn").forEach(b=>b.classList.toggle("active",b.d
 document.querySelectorAll(".day-btn,.filter-chip").forEach(b=>b.setAttribute("aria-pressed",String(b.classList.contains("active"))));
 const serviceStatus=document.getElementById("serviceStatus");
 serviceStatus.textContent=SERVICE_META.checked_at
-  ? " Cambios comprobados: "+SERVICE_META.checked_at.replace("T"," ").slice(0,16)+" (España)."
+  ? " Cambios consultados: "+SERVICE_META.checked_at.replace("T"," ").slice(0,16)+" (España)."+(SERVICE_META.issues?" Algunas fuentes no respondieron.":"")
   : " Cambios en tiempo real no disponibles.";
 // PWA setup is part of the generated HTML so each daily update preserves installation.
 if ("serviceWorker" in navigator) {
