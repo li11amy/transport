@@ -19,6 +19,15 @@ class CompactStatusTests(unittest.TestCase):
         self.assertIn("Añadir a pantalla de inicio", HTML)
         self.assertIn("h1{font-size:clamp(23px,5vw,26px);margin:4px 0 5px;text-align:center", HTML)
 
+    def test_boat_status_and_native_install_only(self):
+        dom = BeautifulSoup(HTML, "html.parser")
+        self.assertIsNotNone(dom.select_one("#boatReference[hidden]"))
+        self.assertIsNotNone(dom.select_one("#installButton[hidden]"))
+        self.assertIn('installButton.hidden=installedMode()||!deferredInstallPrompt', HTML)
+        self.assertIn('marine.textContent="⛴ B-042 · Operativo"', HTML)
+        self.assertIn('marine.textContent="⛴ B-042 · Incidencias"', HTML)
+        self.assertIn('marine.textContent="⛴ B-042 · Sin verificar"', HTML)
+
     def test_one_legend_and_one_global_train_date(self):
         dom = BeautifulSoup(HTML, "html.parser")
         self.assertEqual(len(dom.select("#warningSummary")), 1)
