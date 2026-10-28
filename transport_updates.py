@@ -219,6 +219,7 @@ def bus_notices(data, now, session=None):
             continue
         notices.sort(reverse=True)
         published, title, source = notices[0]
+        affected_routes = []
         for route, trips in data.items():
             for trip in trips:
                 if trip["linea"] != code or not runs_today(trip["dias"], now):
@@ -229,11 +230,14 @@ def bus_notices(data, now, session=None):
                     "fuente_cambio": source,
                     "fecha_cambio": now.date().isoformat(),
                 })
-                events.append({
-                    "id": "bus:{}:{}:{}:{}".format(route, code, trip["salida"], trip["dias"]),
-                    "route": route, "line": code, "detail": title, "source": source,
-                    "date": now.date().isoformat(),
-                })
+                affected_routes.append(route)
+        if affected_routes:
+            events.append({
+                "id": "bus:{}:{}".format(code, published.isoformat()),
+                "route": ", ".join(sorted(set(affected_routes))),
+                "line": code, "detail": title, "source": source,
+                "date": now.date().isoformat(),
+            })
     return events, problems
 
 
