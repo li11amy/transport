@@ -294,3 +294,41 @@ Apply this UI-only change on the transport VPS with
 existing site and in-flight timer, then tests and creates a new HTML shell
 using the **currently published JSON**, without contacting CTAN/Renfe or
 changing systemd/Nginx/Docker. The JSON-only 15-minute update continues.
+
+## Header and PWA install control (2026-10-28)
+
+The compact mobile title is centered over the whole transport application
+width, with a short location subtitle `El Puerto · Cádiz · Jerez`.
+The Renfe service-date reference remains one compact line under the filters.
+The red/yellow service legend now uses a restrained single-row layout where
+space permits; tapping highlighted rows still reveals the source.
+
+**Install as an app:** this site already has a scoped
+`/transport/manifest.json`, a network-first `sw.js`, the three application
+icons, HTTPS, and `display: standalone`. No new app store, APK, domain, or
+dedicated backend is required. A small `Instalar app` control beside the
+subtitle:
+
+- On supporting Chromium browsers, stores the `beforeinstallprompt`
+  event and opens the **native browser install prompt** from the user click.
+- If that browser event does not fire, opens a small manual instruction for
+  Android Chrome (`⋮ → Instalar aplicación` or
+  `Añadir a pantalla de inicio`) or Safari on iOS (Share → Home Screen).
+- Hides the control in standalone mode and on the `appinstalled` event.
+- Does **not** promise an installation when the browser declines, and does not
+  interfere with direct browser-menu installation or force a recurring pop-up.
+
+To publish only this HTML change from the main checkout on the existing
+transport VPS, use `deploy/apply-header-pwa.sh`. This script checks Git,
+waits for the updater, runs offline tests and reconstructs only
+`/srv/www/transport/index.html` from the currently public JSON. It does not
+refresh upstream data, change service worker assets, modify Docker/AVÍO, or
+create periodic data commits. JSON refreshes remain every 15 minutes.
+
+After publishing: open `https://peluche-ebanache.com/transport/` in Chrome
+on Android, tap `Instalar app`, confirm browser installation, launch the home
+screen icon, verify the absence of the browser address bar and that reopening
+the app refreshes JSON. If the browser cannot provide an install prompt, the
+manual menu instructions will be shown instead. Browser installations may
+show an add-to-home-screen shortcut rather than a standalone install depending
+on the platform/browser.
