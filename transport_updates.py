@@ -405,12 +405,15 @@ def apply_changes(data, sender, now=None, session=None):
     statistics = {}
     rail, rail_problems = rail_changes(data, now, session, statistics)
     bus, bus_problems = bus_notices(data, now, session, statistics)
+    from maritime_status import live_maritime_changes
+    ferry, ferry_problems = live_maritime_changes(data, now, session, statistics)
+    # The maritime JSON is more authoritative for B-042 than news headlines.
     # Avoid 10 Telegram messages for the same advisory repeated in city-pair views.
-    unique = {event["id"]: event for event in rail + bus}
+    unique = {event["id"]: event for event in rail + bus + ferry}
     notify_events(list(unique.values()), sender, now)
     report = {
         "checked_at": now.isoformat(timespec="seconds"), "today": now.date().isoformat(),
-        "events": list(unique.values()), "problems": rail_problems + bus_problems,
+        "events": list(unique.values()), "problems": rail_problems + bus_problems + ferry_problems,
         "sources": statistics,
     }
     REPORT_FILE.parent.mkdir(parents=True, exist_ok=True)
