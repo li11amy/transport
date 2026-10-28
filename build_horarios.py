@@ -6,6 +6,7 @@ import json
 import os
 import re
 import hashlib
+import argparse
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -18,6 +19,7 @@ BASE_URL = "https://siu.cmtbc.es/es/horarios_origen_destino.php"
 CITIES = {"puerto": (8, "El Puerto"), "cadiz": (1, "Cádiz"), "jerez": (14, "Jerez")}
 ROUTES = [(a, b) for a in CITIES for b in CITIES if a != b]
 OUTPUT = Path(__file__).parent / "output" / "horarios_tres_ciudades.html"
+DATA_OUTPUT = OUTPUT.parent / "transport_data.json"
 WARNINGS_FILE = OUTPUT.parent / "transport_warning_report.json"
 ALERT_STATE_FILE = OUTPUT.parent / "transport_last_alert.sha256"
 # Source calendar codes. Unknown codes remain visible in red and trigger a report.
@@ -278,8 +280,8 @@ a{color:#1f4fa8}
 </main>
 <script>
 "use strict";
-const DATA = __TRANSPORT_DATA__;
-const SERVICE_META = __SERVICE_META__;
+let DATA = __TRANSPORT_DATA__;
+let SERVICE_META = __SERVICE_META__;
 function spanishToday() {
   return new Intl.DateTimeFormat("sv-SE", {timeZone:"Europe/Madrid",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 }
@@ -455,9 +457,16 @@ document.querySelectorAll(".filter-chip").forEach(btn=>btn.addEventListener("cli
 document.querySelectorAll(".day-btn").forEach(b=>b.classList.toggle("active",b.dataset.day===day));
 document.querySelectorAll(".day-btn,.filter-chip").forEach(b=>b.setAttribute("aria-pressed",String(b.classList.contains("active"))));
 const serviceStatus=document.getElementById("serviceStatus");
-serviceStatus.textContent=SERVICE_META.checked_at
-  ? " Cambios consultados: "+SERVICE_META.checked_at.replace("T"," ").slice(0,16)+" (España)."+(SERVICE_META.issues?" Algunas fuentes no respondieron.":"")
-  : " Cambios en tiempo real no disponibles.";
+function renderSourceStatus() {
+  const checked=Date.parse(SERVICE_META.checked_at||"");
+  const stale=!Number.isFinite(checked)||Date.now()-checked>45*60*1000||Date.now()<checked;
+  serviceStatus.textContent=SERVICE_META.checked_at
+    ? " Datos: "+SERVICE_META.checked_at.replace("T"," ").slice(0,16)+" (España)."+
+      (stale?" La última comprobación es antigua.":"")+
+      (SERVICE_META.issues?" Algunas fuentes no respondieron.":"")
+    : " Cambios en tiempo real no disponibles.";
+}
+renderSourceStatus();
 // PWA setup is part of the generated HTML so each daily update preserves installation.
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/transport/sw.js", {scope:"/transport/"}).catch(e=>console.warn("PWA unavailable",e));
@@ -470,10 +479,28 @@ window.addEventListener("offline",updateConnection);
 window.addEventListener("online",updateConnection);
 updateConnection();
 update();
-// GitHub Pages is static. Periodically load the next published schedule.
-setInterval(()=>{
-  if(document.visibilityState==="visible" && navigator.onLine) window.location.reload();
-}, 15*60*1000);
+// The HTML is a static shell. Fetch updated JSON from the VPS without reloading.
+async function refreshData() {
+  try {
+    const response=await fetch("./transport_data.json",{cache:"no-store"});
+    if(!response.ok)throw new Error("HTTP "+response.status);
+    const payload=await response.json();
+    if(!payload||!payload.data||typeof payload.data!=="object"||
+       !payload.meta||!payload.meta.checked_at)throw new Error("Invalid timetable JSON");
+    // A malformed JSON should not replace the last usable schedule.
+    DATA=payload.data;
+    SERVICE_META=payload.meta;
+    renderSourceStatus();
+    update();
+  } catch(e) {
+    console.warn("No se pudo actualizar el horario",e);
+    renderSourceStatus();
+    serviceStatus.textContent+=" Sin datos nuevos; comprueba el horario antes de viajar.";
+  }
+}
+refreshData();
+setInterval(()=>{if(document.visibilityState==="visible")refreshData();},60*1000);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refreshData();});
 </script>
 </body>
 </html>"""
@@ -524,7 +551,7 @@ def report_issues(issues):
         print("Failed to send Telegram alert: {}".format(exc), flush=True)
 
 
-def build():
+def build(data_only=False):
     data = {}
     issues = []
     try:
@@ -555,13 +582,26 @@ def build():
             sum(t["tipo"] == "tren" for t in trips),
             sum(t["tipo"] == "catamaran" for t in trips),
             len(dropped), ", ".join(dropped[:8])), flush=True)
+    DATA_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    json_text = json.dumps(
+        {"data": data, "meta": meta}, ensure_ascii=False, separators=(",", ":"))
+    # Atomic replace: Nginx/browser can never observe a truncated JSON response.
+    temporary = DATA_OUTPUT.with_suffix(".json.tmp")
+    temporary.write_text(json_text, encoding="utf-8")
+    os.replace(temporary, DATA_OUTPUT)
+    print("DATA", DATA_OUTPUT, len(json_text), "bytes", flush=True)
+    if data_only:
+        return
     output = HTML.replace("__TRANSPORT_DATA__", json.dumps(data, ensure_ascii=False).replace("<", "\\u003c"))
     output = output.replace("__SERVICE_META__", json.dumps(meta, ensure_ascii=False).replace("<", "\\u003c"))
     output = output.replace("__UPDATED__", datetime.now().strftime("%d/%m/%Y"))
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(output, encoding="utf-8")
     print("OUTPUT", OUTPUT, len(output), "bytes", flush=True)
 
 
 if __name__ == "__main__":
-    build()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data-only", action="store_true",
+                        help="Refresh JSON data without regenerating or publishing the HTML shell")
+    args = parser.parse_args()
+    build(data_only=args.data_only)
