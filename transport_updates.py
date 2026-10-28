@@ -252,7 +252,8 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
                     first["seq"] <= local_positions.get(str(x.get("stopId")), -1) <= last["seq"]
                     for x in updates)
                 delayed = any(
-                    abs(int(event.get("delay", 0))) >= 60
+                    first["seq"] <= local_positions.get(str(x.get("stopId")), -1) <= last["seq"]
+                    and abs(int(event.get("delay", 0))) >= 60
                     for x in updates
                     for event in (x.get("arrival"), x.get("departure"))
                     if isinstance(event, dict)
