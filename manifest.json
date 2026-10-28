@@ -11,19 +11,19 @@
   "background_color": "#f5f6f8",
   "icons": [
     {
-      "src": "/transport/icon-192.png",
+      "src": "/transport/icon-192-rgb.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/transport/icon-512.png",
+      "src": "/transport/icon-512-rgb.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/transport/icon-512.png",
+      "src": "/transport/icon-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
