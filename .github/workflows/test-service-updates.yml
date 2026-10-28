@@ -27,7 +27,7 @@ jobs:
       - run: python -m compileall -q build_horarios.py transport_updates.py tests
       - run: python -m unittest discover -s tests -v
       - name: Check real Renfe GTFS join (network may be transient)
-        run: python scripts/smoke_renfe_join.py
+        run: PYTHONPATH=. python scripts/smoke_renfe_join.py
         continue-on-error: true
       - run: bash -n deploy/*.sh
       - run: python -m py_compile deploy/enable-nginx-transport.py
