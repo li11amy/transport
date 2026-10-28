@@ -365,7 +365,7 @@ function todayGroup() {
 function currentServiceStatus(t) {
   const checked=Date.parse(SERVICE_META.checked_at||"");
   const feedFresh=Number.isFinite(checked)&&Date.now()>=checked&&Date.now()-checked<=45*60*1000;
-  if(t.tipo==="catamaran" && types.has("catamaran")){
+  if(t.tipo==="catamaran" && day===todayGroup() && SERVICE_META.date===spanishToday()){
     const verified=Date.parse((SERVICE_META.maritime||{}).checked_at||"");
     if(!Number.isFinite(verified)||Date.now()<verified||Date.now()-verified>45*60*1000){
       return "warning"; // Never show stale B-042 information as confirmed.
