@@ -7,6 +7,7 @@ on:
       - "tests/**"
       - "deploy/**"
       - "sw.js"
+      - "scripts/compare_android_install.cjs"
       - ".github/workflows/test-service-updates.yml"
   pull_request:
     paths:
@@ -40,3 +41,8 @@ jobs:
         continue-on-error: true
       - run: bash -n deploy/*.sh
       - run: python -m py_compile deploy/enable-nginx-transport.py
+      - name: Compare current transport vs Bottle Butler Android PWA installability
+        run: |
+          npm install --no-save puppeteer-core
+          node scripts/compare_android_install.cjs
+        continue-on-error: true
