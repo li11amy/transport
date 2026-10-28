@@ -11,6 +11,8 @@ on:
       - ".github/workflows/test-service-updates.yml"
   pull_request:
     paths:
+      - "scripts/compare_android_install.cjs"
+      - ".github/workflows/test-service-updates.yml"
       - "transport_updates.py"
       - "build_horarios.py"
       - "tests/**"
