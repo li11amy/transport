@@ -247,3 +247,25 @@ Renfe times. JSON updates still do not create Git commits.
 
 Diagnostics for each source are included under `meta.renfe_schedule` and the
 service-change report. Tests: `python3 -m unittest discover -s tests -v`.
+
+### Recovery when CMTBC times out during first Renfe migration
+
+The first migration runs `git merge --squash` before requesting CMTBC. A transient
+`siu.cmtbc.es` read timeout can stop the script **with the intended changes
+staged but not committed**. Do **not** repeat `upgrade-renfe-gtfs.sh`, perform
+`git reset --hard`, or run a second squash on top of those staged files.
+
+The recovery entrypoint is `deploy/recover-renfe-gtfs-timeout.sh`. It first
+verifies host, branch and that the Git index has exactly the tree of the
+previously fetched feature snapshot (`37d6d776`). Any unrelated changes cause
+it to stop rather than overwrite. It stops the refresh timer, waits for an
+in-flight service, applies only the reviewed delta, runs tests and generation,
+checks both Renfe schedule feeds, creates a single code commit, publishes the
+HTML/JSON atomically and restarts the timer. The original public site stays
+unchanged if generation fails.
+
+CMTBC network fetches now retry once. If an individual route still cannot be
+retrieved, the last valid public/local JSON is used for **bus/boat only** with
+a visible unverified-source warning and a Telegram diagnostic. Official Renfe
+train data is never restored from stale CMTBC clocks. If no safe cached
+bus/boat route exists, generation fails without publishing a partial timetable.
