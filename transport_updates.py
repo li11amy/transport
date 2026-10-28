@@ -164,7 +164,8 @@ def rail_changes(data, now, session=None):
                     trip["salida_actual"] = new_departure
                     trip["llegada_actual"] = new_arrival
                 events.append({
-                    "id": "rail:{}:{}:{}:{}".format(route, code, trip["salida"], trip["dias"]),
+                    "id": "rail:{}:{}:{}:{}:{}".format(
+                        now.date().isoformat(), route, code, trip["salida"], trip["dias"]),
                     "route": route, "line": code, "detail": detail, "source": url,
                     "date": now.date().isoformat(),
                 })
@@ -248,12 +249,15 @@ def notify_events(events, sender, now):
         state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         state = {}
-    if state.get("date") != now.date().isoformat():
-        state = {"date": now.date().isoformat(), "sent": {}}
+    if not isinstance(state.get("sent"), dict):
+        state = {"sent": {}}
     sent = state["sent"]
     for event in events:
+        # The publication date of a persistent bus notice is NOT a new event.
+        # Only its ID, detail and source determine whether to send again.
+        signature = {k: v for k, v in event.items() if k != "date"}
         digest = hashlib.sha256(
-            json.dumps(event, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+            json.dumps(signature, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
         if sent.get(event["id"]) == digest:
             continue
         message = (
