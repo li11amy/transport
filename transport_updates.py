@@ -112,8 +112,12 @@ def _close_clock(a, b):
     return min(diff, 1440 - diff) <= 1
 
 
-def static_trip_matches(data, code, static_trip, now):
-    """Connect GTFS trip_id to unique CMTBC rows by full direction + both times."""
+def static_trip_matches(data, code, static_trip, now, trip_id):
+    """Only rows generated from this exact, date-valid Renfe GTFS trip qualify.
+
+    Old CMTBC train times may differ by 20-30 minutes. They must never be
+    matched by nearest clock time, even when the real-time trip looks similar.
+    """
     stops = {x["stop_id"]: x for x in static_trip["stops"]}
     result = []
     for route, trips in data.items():
@@ -122,12 +126,11 @@ def static_trip_matches(data, code, static_trip, now):
         last = stops.get(STATIONS[destination])
         if not first or not last or first["seq"] >= last["seq"]:
             continue
-        scheduled_dep = _hhmm(first["departure"])
-        scheduled_arr = _hhmm(last["arrival"])
         matches = [trip for trip in trips
-                   if trip["linea"] == code and runs_today(trip["dias"], now)
-                   and _close_clock(scheduled_dep, trip["salida"])
-                   and _close_clock(scheduled_arr, trip["llegada"])]
+                   if trip["linea"] == code and trip.get("trip_id") == trip_id
+                   and trip.get("fecha_servicio") == now.date().isoformat()
+                   and _close_clock(_hhmm(first["departure"]), trip["salida"])
+                   and _close_clock(_hhmm(last["arrival"]), trip["llegada"])]
         if len(matches) == 1:
             result.append((route, matches[0], first, last))
     return result
@@ -226,7 +229,7 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
             if relationship not in ("SCHEDULED", "CANCELED"):
                 continue
 
-            matches = static_trip_matches(data, code, static_trip, now)
+            matches = static_trip_matches(data, code, static_trip, now, trip_id)
             if not matches:
                 continue
             counters["matched_trips"] += len(matches)
