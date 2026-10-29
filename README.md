@@ -438,3 +438,71 @@ It refuses to republish stale day data, checks host/clean Git, preserves
 systemd updater/timer, runs tests in a separate worktree and publishes
 HTML/JSON atomically. The next 15-minute refresh regenerates the same
 sourced warning and sends the Telegram notice (if configured).
+
+## Root-scoped PWA on separate transport hostname (29 October 2026)
+
+Android Chrome did not permit WebAPK installation from the path-scoped
+`https://peluche-ebanache.com/transport/` app, even after RGB launcher
+icons were updated and Chromium DevTools showed no installability errors.
+A separately hosted root-scoped PWA is prepared at
+`https://transport.peluche-ebanache.com/`; the old page stays online as
+a fallback. This is a compatibility experiment, not yet verified on Android.
+
+The standalone root PWA has:
+- `manifest.json`: `id=/`, `start_url=/`, `scope=/`, RGB and
+  maskable icons at the new origin root;
+- `sw.js`: scope `/` and independent
+  `transport-bahia-root-v1` offline cache;
+- `index.html`: identical visual and service-alert logic to
+  the path-scoped page, but root-relative service-worker and assets;
+- `/transport_data.json`: **Nginx alias** to the existing
+  `/srv/www/transport/transport_data.json` from the original 15-minute
+  updater; no duplicated parser, scheduler, DB or Git commits.
+
+All independent static assets reside under
+`/srv/www/transport-pwa-root`. This is **not** the Astro AVÍO directory
+`/srv/www/avio-site`. Original `/srv/www/transport` is untouched.
+
+### DNS and TLS prerequisites
+
+Create a **proxied CNAME** in Cloudflare DNS for the zone
+`peluche-ebanache.com`:
+
+- Type `CNAME`
+- Name `transport`
+- Target `peluche-ebanache.com`
+- Proxy `Proxied`
+
+This is a separate hostname pointed at the same VPS. It must be live in
+DNS before enabling the Nginx vhost.
+
+The safe installer `deploy/subdomain/enable_https.py` also checks that
+the currently configured TLS certificate of
+`/etc/nginx/sites-available/peluche-ebanache.com` covers
+`transport.peluche-ebanache.com`. It **does not** assume that an ordinary
+single-domain certificate is a wildcard, and will refuse to change Nginx
+if the certificate does not cover the subdomain. In that case a new valid
+certificate must be obtained and the vhost installer updated accordingly.
+The existing AVÍO Nginx configuration is never overwritten.
+
+### Staging/activation
+
+On the transport VPS, with a clean main checkout:
+
+```bash
+cd /home/ubuntu/Sites/transport
+git fetch origin feature/transport-root-subdomain-20261029
+git show FETCH_HEAD:deploy/subdomain/stage-and-enable.sh | bash
+```
+
+The script checks host, working directory and Git status, creates a
+fresh isolated worktree, runs offline tests, copies only static assets into
+the independent webroot, then attempts guarded HTTPS activation.
+If DNS or matching TLS is missing, it prints the reason and **does not**
+modify Nginx or Git main. The old /transport/ app stays available.
+
+After HTTPS activation, verify
+`https://transport.peluche-ebanache.com/` and
+`https://transport.peluche-ebanache.com/transport_data.json`.
+Then test Chrome Android `Instalar`: only an independently launched
+standalone home-screen application counts as success.
