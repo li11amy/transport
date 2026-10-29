@@ -409,9 +409,13 @@ def apply_changes(data, sender, now=None, session=None):
     ferry, ferry_problems = live_maritime_changes(data, now, session, statistics)
     if statistics.get("MARITIME_B042", {}).get("status") != "unavailable":
         bus = [event for event in bus if event.get("line") != "B-042"]
+    # Source-backed incidents (including strikes) are broader than GTFS realtime.
+    # Apply after RT: an explicit verified cancellation stays red.
+    from source_alerts import apply_source_alerts
+    official_events, official_summaries = apply_source_alerts(data, now)
     # The maritime JSON is more authoritative for B-042 than news headlines.
     # Avoid 10 Telegram messages for the same advisory repeated in city-pair views.
-    unique = {event["id"]: event for event in rail + bus + ferry}
+    unique = {event["id"]: event for event in rail + bus + ferry + official_events}
     notify_events(list(unique.values()), sender, now)
     report = {
         "checked_at": now.isoformat(timespec="seconds"), "today": now.date().isoformat(),
@@ -424,4 +428,5 @@ def apply_changes(data, sender, now=None, session=None):
         print("Service update source: " + error, flush=True)
     return {"date": report["today"], "checked_at": report["checked_at"],
             "issues": len(report["problems"]), "changes": len(unique),
-            "maritime": statistics.get("MARITIME_B042", {"status": "unknown"})}
+            "maritime": statistics.get("MARITIME_B042", {"status": "unknown"}),
+            "official_alerts": official_summaries}
