@@ -264,6 +264,10 @@ td:nth-child(3){font-size:14px;color:#444}
 .empty-note{text-align:center;color:#666;font-size:14px;padding:18px 0}
 .source-note{font-size:12px;color:#777;line-height:1.5;margin-top:12px}
 .reference-date{font-size:12px;color:#64748b;margin-top:-4px;margin-bottom:2px}
+.reference-meta{display:flex;flex-wrap:wrap;align-items:center;gap:5px 14px}
+.maritime-operational{color:#247343}
+.maritime-affected{color:#a72121;font-weight:600}
+.maritime-unknown{color:#91600b}
 .reference-date[hidden],.status-legend[hidden],.trip-extra[hidden]{display:none}
 .status-legend{display:flex;gap:7px 12px;align-items:center;flex-wrap:wrap;margin:0 1px 10px;padding:9px 10px;border:1px solid #e1e5ec;border-radius:10px;background:#fff;font-size:11px;color:#596474}
 .status-legend span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
@@ -292,7 +296,7 @@ a{color:#1f4fa8}
   <h1>Horarios de transporte</h1>
   <div class="page-meta">
     <span class="area-label">El Puerto · Cádiz · Jerez</span>
-    <button type="button" class="install-link" id="installButton">Instalar app</button>
+    <button type="button" class="install-link" id="installButton" hidden>Instalar app</button>
   </div>
   <div class="install-help" id="installHelp" hidden role="status">
     <button type="button" id="closeInstallHelp" aria-label="Cerrar instrucciones">×</button>
@@ -325,7 +329,10 @@ a{color:#1f4fa8}
     <button type="button" class="filter-chip active" data-type="bus">🚌 Bus</button>
     <button type="button" class="filter-chip active" data-type="tren">🚆 Tren</button>
   </div>
-  <div id="trainReference" class="reference-date" hidden></div>
+  <div class="reference-meta">
+    <div id="trainReference" class="reference-date" hidden></div>
+    <div id="boatReference" class="reference-date" hidden></div>
+  </div>
 </div>
 <div id="warningSummary" class="status-legend" aria-label="Leyenda de cambios" hidden>
   <span><i class="status-dot cancelled" aria-hidden="true"></i>Cancelado</span>
@@ -358,6 +365,12 @@ function todayGroup() {
 function currentServiceStatus(t) {
   const checked=Date.parse(SERVICE_META.checked_at||"");
   const feedFresh=Number.isFinite(checked)&&Date.now()>=checked&&Date.now()-checked<=45*60*1000;
+  if(t.tipo==="catamaran" && day===todayGroup() && SERVICE_META.date===spanishToday()){
+    const verified=Date.parse((SERVICE_META.maritime||{}).checked_at||"");
+    if(!Number.isFinite(verified)||Date.now()<verified||Date.now()-verified>45*60*1000){
+      return "warning"; // Never show stale B-042 information as confirmed.
+    }
+  }
   return SERVICE_META.date===spanishToday() && day===todayGroup() && t.fecha_cambio===spanishToday()
       && (t.tipo!=="tren"||feedFresh) ? (t.estado||"") : "";
 }
@@ -439,6 +452,25 @@ function update() {
   reference.textContent=dates.length
     ? "Trenes Renfe · horarios del "+dates.map(d=>d.split("-").reverse().join("/")).join(", ")
     : "";
+  const marine=document.getElementById("boatReference");
+  marine.hidden=!types.has("catamaran");
+  marine.className="reference-date";
+  if(!marine.hidden){
+    const state=SERVICE_META.maritime||{};
+    const last=Date.parse(state.checked_at||"");
+    const fresh=Number.isFinite(last)&&Date.now()>=last&&Date.now()-last<=45*60*1000;
+    const status=fresh?state.status:"unknown";
+    if(status==="operational"){
+      marine.textContent="⛴ B-042 · Operativo";
+      marine.classList.add("maritime-operational");
+    }else if(status==="affected"){
+      marine.textContent="⛴ B-042 · Incidencias";
+      marine.classList.add("maritime-affected");
+    }else{
+      marine.textContent="⛴ B-042 · Sin verificar";
+      marine.classList.add("maritime-unknown");
+    }
+  }
   body.replaceChildren();
   const fragment=document.createDocumentFragment();
   for(const t of trips) {
@@ -580,7 +612,9 @@ let deferredInstallPrompt=null;
 const installedMode=()=>window.matchMedia("(display-mode: standalone)").matches||
   window.navigator.standalone===true;
 function updateInstallVisibility(){
-  installButton.hidden=installedMode();
+  // Only advertise installation when Chrome actually offers its native prompt.
+  // A browser-only shortcut must not be presented as an installable app.
+  installButton.hidden=installedMode()||!deferredInstallPrompt;
   if(installedMode())installHelp.hidden=true;
 }
 window.addEventListener("beforeinstallprompt",event=>{
