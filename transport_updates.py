@@ -172,6 +172,51 @@ def _prediction(stop_update, kind, scheduled, now):
     return None
 
 
+def _signed_minutes(planned, revised):
+    """Clock change in minutes, including trips crossing midnight."""
+    delta = (_minutes(revised) - _minutes(planned)) % 1440
+    return delta - 1440 if delta > 720 else delta
+
+
+def _passenger_rail_times(planned_dep, planned_arr, actual_dep, actual_arr):
+    """Explain exactly which endpoint changed; do not imply both were updated."""
+    departure = actual_dep or planned_dep
+    arrival = actual_arr or planned_arr
+
+    def suffix(planned, revised):
+        if revised is None or revised == planned:
+            return ""
+        delta = _signed_minutes(planned, revised)
+        return " ({:+d} min)".format(delta) if delta else ""
+
+    return ("Renfe · Salida {}{} · Llegada {}{}".format(
+        departure, suffix(planned_dep, actual_dep),
+        arrival, suffix(planned_arr, actual_arr)))
+
+
+def _public_source_line(event):
+    """Never expose machine-readable .json feed links to Telegram users."""
+    url = event.get("source", "")
+    if url in RENFE.values():
+        if event.get("line") == "C-1":
+            return "Consultar Cercanías en Renfe: https://tiempo-real.renfe.com/?lang=es"
+        return "Fuente: Renfe (datos oficiales en tiempo real)"
+    return "Fuente: " + url if url else ""
+
+
+def format_notification(event):
+    """Human-readable, link-preview-safe message; raw feed stays in diagnostics."""
+    names = {"jerez": "Jerez", "cadiz": "Cádiz", "puerto": "El Puerto"}
+    route = event["route"]
+    parts = route.split("-")
+    if len(parts) == 2 and all(part in names for part in parts):
+        route = " → ".join(names[part] for part in parts)
+    header = "Cambio de transporte · {}\n{} · {}\n{}".format(
+        event["date"], route, event["line"], event["detail"])
+    source = _public_source_line(event)
+    return header + ("\n" + source if source else "")
+
+
 def _in_segment(updates, first, last):
     """Any update explicitly located at a station within our GTFS segment."""
     positions = {x["stop_id"]: x["seq"] for x in (first, last)}
@@ -266,10 +311,10 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
                     detail = "Renfe: servicio cancelado o parada suprimida"
                 elif changed_departure or changed_arrival:
                     status = "confirmed"
-                    revised_dep = actual_departure if changed_departure else trip["salida"]
-                    revised_arr = actual_arrival if changed_arrival else trip["llegada"]
-                    detail = "Renfe: {} → {} (previsto {} → {})".format(
-                        revised_dep, revised_arr, trip["salida"], trip["llegada"])
+                    detail = _passenger_rail_times(
+                        trip["salida"], trip["llegada"],
+                        actual_departure if changed_departure else None,
+                        actual_arrival if changed_arrival else None)
                 elif delayed and relevant:
                     status = "warning"
                     detail = "Renfe: retraso comunicado en una parada del trayecto; horario pendiente de confirmar"
@@ -388,10 +433,7 @@ def notify_events(events, sender, now):
             json.dumps(signature, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
         if sent.get(event["id"]) == digest:
             continue
-        message = (
-            "Cambio de transporte · {}\n{} · {}\n{}\nFuente: {}".format(
-                event["date"], event["route"], event["line"],
-                event["detail"], event["source"]))
+        message = format_notification(event)
         try:
             if sender(message):
                 sent[event["id"]] = digest
