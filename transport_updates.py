@@ -206,9 +206,13 @@ def _public_source_line(event):
 
 def format_notification(event):
     """Human-readable, link-preview-safe message; raw feed stays in diagnostics."""
+    names = {"jerez": "Jerez", "cadiz": "Cádiz", "puerto": "El Puerto"}
+    route = event["route"]
+    parts = route.split("-")
+    if len(parts) == 2 and all(part in names for part in parts):
+        route = " → ".join(names[part] for part in parts)
     header = "Cambio de transporte · {}\n{} · {}\n{}".format(
-        event["date"], event["route"].replace("-", " → "),
-        event["line"], event["detail"])
+        event["date"], route, event["line"], event["detail"])
     source = _public_source_line(event)
     return header + ("\n" + source if source else "")
 
