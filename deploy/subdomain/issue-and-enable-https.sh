@@ -24,6 +24,20 @@ done
 git fetch origin "$BRANCH"
 BOOTSTRAP="deploy/subdomain/bootstrap_http.py"
 ACTIVATE="deploy/subdomain/enable_https.py"
+cert="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+
+# A previous interrupted run may already have issued the correct certificate.
+# Activate it without a second ACME request or rate-limit risk.
+if sudo test -s "$cert" &&
+   sudo openssl x509 -in "$cert" -noout -checkhost "$DOMAIN" 2>/dev/null |
+      grep -q "does match" &&
+   sudo openssl x509 -in "$cert" -noout -checkend 86400 >/dev/null 2>&1; then
+    echo "Existing dedicated TLS certificate is valid; skipping issuance."
+    git show "FETCH_HEAD:$ACTIVATE" | sudo python3 -
+    curl -fsSI --max-time 20 "https://$DOMAIN/"
+    curl -fsSI --max-time 20 "https://$DOMAIN/transport_data.json"
+    exit 0
+fi
 git show "FETCH_HEAD:$BOOTSTRAP" | sudo python3 - setup
 
 challenge=""
