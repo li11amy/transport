@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Guarded HTTPS vhost for transport.peluche-ebanache.com.
 
-Require explicit DNS and a certificate covering the subdomain. Never
-reconfigure the existing AVÍO virtual host or issue a certificate implicitly.
+Require explicit DNS and a certificate covering the subdomain. An owned
+temporary HTTP-01 challenge vhost may be replaced after issuance. Never
+change the existing AVÍO host or any unrelated Nginx configuration.
 """
 import os
 import re
-import shutil
 import socket
 import subprocess
 import sys
@@ -17,6 +17,9 @@ ORIGINAL=Path("/etc/nginx/sites-available/peluche-ebanache.com")
 AVAILABLE=Path("/etc/nginx/sites-available/"+DOMAIN)
 ENABLED=Path("/etc/nginx/sites-enabled/"+DOMAIN)
 ROOT=Path("/srv/www/transport-pwa-root")
+OWNED_BOOTSTRAP="# transport-acme-bootstrap-v1"
+PREFERRED_CERT=Path("/etc/letsencrypt/live/"+DOMAIN+"/fullchain.pem")
+PREFERRED_KEY=Path("/etc/letsencrypt/live/"+DOMAIN+"/privkey.pem")
 
 
 def run(*args):
@@ -33,8 +36,11 @@ def install():
             raise RuntimeError("Missing root PWA asset: "+filename)
     if not Path("/srv/www/transport/transport_data.json").is_file():
         raise RuntimeError("Original live timetable JSON missing")
-    if AVAILABLE.exists() or ENABLED.exists() or ENABLED.is_symlink():
-        raise RuntimeError("Existing subdomain Nginx configuration: inspect manually")
+    bootstrap = (AVAILABLE.is_file() and
+                 AVAILABLE.read_text(encoding="utf-8").startswith(OWNED_BOOTSTRAP+"\n") and
+                 ENABLED.is_symlink() and ENABLED.resolve()==AVAILABLE)
+    if (AVAILABLE.exists() or ENABLED.exists() or ENABLED.is_symlink()) and not bootstrap:
+        raise RuntimeError("Existing non-bootstrap subdomain Nginx configuration: inspect manually")
     try:
         addresses=socket.getaddrinfo(DOMAIN,443)
         if not addresses:
@@ -46,15 +52,19 @@ def install():
 
     if not ORIGINAL.exists():
         raise RuntimeError("Existing main-domain Nginx config absent: "+str(ORIGINAL))
-    original=ORIGINAL.read_text(encoding="utf-8")
-    certificates=set(re.findall(r"(?m)^\s*ssl_certificate\s+([^;\s]+)\s*;",original))
-    keys=set(re.findall(r"(?m)^\s*ssl_certificate_key\s+([^;\s]+)\s*;",original))
-    if len(certificates)!=1 or len(keys)!=1:
-        raise RuntimeError("Could not uniquely determine main-domain certificate; no changes")
-    cert=next(iter(certificates))
-    key=next(iter(keys))
+    if PREFERRED_CERT.is_file() and PREFERRED_KEY.is_file():
+        cert, key = str(PREFERRED_CERT), str(PREFERRED_KEY)
+    else:
+        # The old main-domain certificate is used only if it ALREADY covers
+        # this hostname. It is never enlarged or overwritten.
+        original=ORIGINAL.read_text(encoding="utf-8")
+        certificates=set(re.findall(r"(?m)^\s*ssl_certificate\s+([^;\s]+)\s*;",original))
+        keys=set(re.findall(r"(?m)^\s*ssl_certificate_key\s+([^;\s]+)\s*;",original))
+        if len(certificates)!=1 or len(keys)!=1:
+            raise RuntimeError("Cannot identify the existing main-domain certificate")
+        cert, key = next(iter(certificates)), next(iter(keys))
     if not Path(cert).is_file() or not Path(key).is_file():
-        raise RuntimeError("Existing TLS certificate/key inaccessible; no changes")
+        raise RuntimeError("Selected TLS certificate/key inaccessible")
     check=run("openssl","x509","-in",cert,"-noout","-checkhost",DOMAIN)
     if check.returncode!=0 or "does NOT match" in check.stdout:
         raise RuntimeError(
@@ -67,7 +77,12 @@ def install():
         "server {\n"
         "    listen 80;\n"
         "    server_name "+DOMAIN+";\n"
-        "    return 308 https://$host$request_uri;\n"
+        "    root "+str(ROOT)+";\n"
+        "    location ^~ /.well-known/acme-challenge/ {\n"
+        "        default_type text/plain;\n"
+        "        try_files $uri =404;\n"
+        "    }\n"
+        "    location / { return 308 https://$host$request_uri; }\n"
         "}\n\n"
         "server {\n"
         "    listen 443 ssl;\n"
@@ -76,6 +91,10 @@ def install():
         "    ssl_certificate_key "+key+";\n"
         "    root "+str(ROOT)+";\n"
         "    index index.html;\n"
+        "    location ^~ /.well-known/acme-challenge/ {\n"
+        "        default_type text/plain;\n"
+        "        try_files $uri =404;\n"
+        "    }\n"
         "    location = /transport_data.json {\n"
         "        alias /srv/www/transport/transport_data.json;\n"
         '        add_header Cache-Control "no-store, max-age=0" always;\n'
@@ -86,10 +105,16 @@ def install():
         "    }\n"
         "}\n"
     )
+    previous=AVAILABLE.read_text(encoding="utf-8") if bootstrap else None
+    temp=AVAILABLE.with_suffix(".new")
+    if temp.exists():
+        raise RuntimeError("Unexpected temporary Nginx file: "+str(temp))
     try:
-        AVAILABLE.write_text(text,encoding="utf-8")
-        AVAILABLE.chmod(0o644)
-        ENABLED.symlink_to(AVAILABLE)
+        temp.write_text(text,encoding="utf-8")
+        temp.chmod(0o644)
+        os.replace(temp, AVAILABLE)
+        if not bootstrap:
+            ENABLED.symlink_to(AVAILABLE)
         test=run("nginx","-t")
         if test.returncode!=0:
             raise RuntimeError("nginx -t rejected configuration: "+test.stderr)
@@ -97,8 +122,12 @@ def install():
         if reload.returncode!=0:
             raise RuntimeError("Nginx reload failed: "+reload.stderr)
     except Exception:
-        ENABLED.unlink(missing_ok=True)
-        AVAILABLE.unlink(missing_ok=True)
+        temp.unlink(missing_ok=True)
+        if previous is not None:
+            AVAILABLE.write_text(previous, encoding="utf-8")
+        else:
+            ENABLED.unlink(missing_ok=True)
+            AVAILABLE.unlink(missing_ok=True)
         run("nginx","-t")
         run("systemctl","reload","nginx")
         raise
