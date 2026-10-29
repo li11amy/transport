@@ -268,6 +268,8 @@ td:nth-child(3){font-size:14px;color:#444}
 .maritime-operational{color:#247343}
 .maritime-affected{color:#a72121;font-weight:600}
 .maritime-unknown{color:#91600b}
+.official-alert{font-size:12px;color:#855b08;font-weight:600}
+.official-alert a{color:inherit;text-decoration:underline;text-underline-offset:2px}
 .reference-date[hidden],.status-legend[hidden],.trip-extra[hidden]{display:none}
 .status-legend{display:flex;gap:7px 12px;align-items:center;flex-wrap:wrap;margin:0 1px 10px;padding:9px 10px;border:1px solid #e1e5ec;border-radius:10px;background:#fff;font-size:11px;color:#596474}
 .status-legend span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
@@ -332,6 +334,7 @@ a{color:#1f4fa8}
   <div class="reference-meta">
     <div id="trainReference" class="reference-date" hidden></div>
     <div id="boatReference" class="reference-date" hidden></div>
+    <div id="officialAlerts" class="official-alert" hidden></div>
   </div>
 </div>
 <div id="warningSummary" class="status-legend" aria-label="Leyenda de cambios" hidden>
@@ -452,6 +455,20 @@ function update() {
   reference.textContent=dates.length
     ? "Trenes Renfe · horarios del "+dates.map(d=>d.split("-").reverse().join("/")).join(", ")
     : "";
+  const alertBox=document.getElementById("officialAlerts");
+  alertBox.replaceChildren();
+  const activeAlerts=day===todayGroup()
+    ? (SERVICE_META.official_alerts||[]).filter(a=>a.date===spanishToday())
+    : [];
+  alertBox.hidden=activeAlerts.length===0;
+  for(const alert of activeAlerts){
+    const link=document.createElement("a");
+    link.href=alert.source;
+    link.target="_blank";
+    link.rel="noopener noreferrer";
+    link.textContent="⚠ "+alert.title+" · comprobar trenes";
+    alertBox.appendChild(link);
+  }
   const marine=document.getElementById("boatReference");
   marine.hidden=!types.has("catamaran");
   marine.className="reference-date";
