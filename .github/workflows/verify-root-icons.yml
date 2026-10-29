@@ -8,6 +8,13 @@ on:
       - "tests/test_subdomain_root.py"
       - "tests/test_pwa_icon_refresh.py"
       - ".github/workflows/verify-root-icons.yml"
+  pull_request:
+    paths:
+      - "deploy/subdomain/build_root.py"
+      - "deploy/subdomain/publish-versioned-icons.py"
+      - "tests/test_subdomain_root.py"
+      - "tests/test_pwa_icon_refresh.py"
+      - ".github/workflows/verify-root-icons.yml"
 jobs:
   checks:
     runs-on: ubuntu-latest
