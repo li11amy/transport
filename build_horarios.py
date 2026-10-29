@@ -532,12 +532,27 @@ function update() {
         (cancelled?"Servicio cancelado.":"Comprueba este servicio antes de viajar.");
       details.appendChild(message);
       if(t.fuente_cambio) {
-        const source=document.createElement("a");
-        source.href=t.fuente_cambio;
-        source.target="_blank";
-        source.rel="noopener noreferrer";
-        source.textContent="Fuente";
-        details.appendChild(source);
+        const technicalRenfe=t.tipo==="tren" &&
+          /^https:\/\/gtfsrt\.renfe\.com\//.test(t.fuente_cambio);
+        if(technicalRenfe && t.linea==="C-1"){
+          const source=document.createElement("a");
+          source.href="https://tiempo-real.renfe.com/?lang=es";
+          source.target="_blank";
+          source.rel="noopener noreferrer";
+          source.textContent="Consultar Cercanías en Renfe";
+          details.appendChild(source);
+        } else if(technicalRenfe){
+          const source=document.createElement("span");
+          source.textContent="Fuente: Renfe (datos oficiales en tiempo real)";
+          details.appendChild(source);
+        } else {
+          const source=document.createElement("a");
+          source.href=t.fuente_cambio;
+          source.target="_blank";
+          source.rel="noopener noreferrer";
+          source.textContent="Fuente";
+          details.appendChild(source);
+        }
       }
       extra.appendChild(details);
       fragment.appendChild(extra);
@@ -707,7 +722,11 @@ def notify_telegram(message):
     if not token or not chat_id:
         print("Telegram is not configured in this environment; report saved locally.", flush=True)
         return False
-    payload = {"chat_id": chat_id, "text": message[:3500]}
+    payload = {
+        "chat_id": chat_id, "text": message[:3500],
+        # No Telegram preview cards or apparent JSON file attachments.
+        "link_preview_options": json.dumps({"is_disabled": True}),
+    }
     if topic_id:
         payload["message_thread_id"] = topic_id
     r = requests.post(
