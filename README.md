@@ -554,3 +554,46 @@ that Certbot's existing automatic renewal timer is enabled using
 `systemctl list-timers --all | grep -Ei 'certbot|letsencrypt'`.
 The new certificate's renewal settings retain its webroot challenge and
 Nginx reload deploy hook.
+
+### Android launcher icon refresh: new URLs (29 Oct 2026)
+
+The user wanted the **route pictogram to fill more of the Android launcher
+circle**. The initial `icon-512-maskable.png` was scaled down by 25%.
+We replaced it with the larger pre-existing blue/yellow original, without
+redrawing artwork. But on Chrome 144+ replacing an image at the **same URL**
+does not necessarily update the WebAPK: the browser now compares manifest
+`icons[].src` before even fetching the bytes. Official explanation:
+https://developer.chrome.com/blog/improvements-to-web-app-updates
+
+Therefore this second fix gives the primary root-scoped PWA **new icon
+URLs**: `icon-192-rgb-v2.png`, `icon-512-rgb-v2.png`,
+`icon-512-maskable-large-v2.png`. All three preserve the original
+blue/yellow artwork; the maskable uses the full-size regular icon instead
+of the earlier 75%-size variant. The root HTML points to
+`/manifest.json?v=4`, service-worker cache is
+`transport-bahia-root-v3`, and these new assets are precached. Future
+root builds must preserve those exact filenames.
+
+For the **already installed HTTPS** subdomain, publish only these assets
+with a safe local script (do not rerun TLS/Certbot/full Nginx deployment):
+
+```bash
+cd /home/ubuntu/Sites/transport
+git fetch origin feature/transport-root-subdomain-20261029
+git show FETCH_HEAD:deploy/subdomain/publish-versioned-icons.py | python3
+```
+
+It checks the exact VPS hostname, clean main checkout, root PWA scope and
+service-worker format, then publishes versioned icons BEFORE the manifest,
+HTML and service worker with atomic replacement and rollback. No timetable
+rebuild, JSON refresh, Git merge, Certbot, Nginx, AVÍO, or other site is
+altered. It is idempotent.
+
+After publication the Android launcher might retain its old icon until
+Chrome processes a WebAPK manifest update; the fastest visual check is
+to **remove/uninstall the existing installed PWA and install it afresh**
+from the root-scoped HTTPS URL. If Android's *Themed icons* option is on,
+the OS will tint the art monochrome even if the PWA supplies a blue/yellow
+asset; temporarily switching that option off distinguishes a real image
+size issue from the Android launcher theme. This is not an Android
+installability fix and should not be described as one.
