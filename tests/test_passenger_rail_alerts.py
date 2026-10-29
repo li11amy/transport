@@ -36,7 +36,7 @@ class PassengerRailAlertTests(unittest.TestCase):
             message = updates.format_notification(event)
             self.assertNotIn(".json", message)
             self.assertNotIn("gtfsrt.renfe.com", message)
-            self.assertIn("jerez → cadiz", message)
+            self.assertIn("Jerez → Cádiz", message)
             self.assertIn("(+1 min)", message)
             if code == "C-1":
                 self.assertIn("https://tiempo-real.renfe.com/?lang=es", message)
