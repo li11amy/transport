@@ -1,4 +1,5 @@
 """Offline regressions for official CMTBC B-042 live maritime status."""
+import json
 import unittest
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -30,10 +31,11 @@ def window(text):
 class FakeResponse:
     def __init__(self, body):
         self.body=body
+        self.content=json.dumps(body,ensure_ascii=False).encode("utf-8-sig")
     def raise_for_status(self):
         return None
     def json(self):
-        return self.body
+        raise AssertionError("Do not use Response.json: official feed has UTF-8 BOM")
 class FakeHttp:
     def __init__(self,body):
         self.body=body
@@ -41,6 +43,15 @@ class FakeHttp:
         return FakeResponse(self.body)
 
 class MarineTests(unittest.TestCase):
+    def test_bom_payload_is_accepted_and_marked_operational(self):
+        rows=data()
+        statistics={}
+        events,errors=live_maritime_changes(
+            rows,NOW,session=FakeHttp(status()),statistics=statistics)
+        self.assertEqual(errors,[])
+        self.assertEqual(events,[])
+        self.assertEqual(statistics["MARITIME_B042"]["status"],"operational")
+
     def test_live_operational_is_white(self):
         rows=data()
         changes,meta=evaluate_status(rows,NOW,status())
