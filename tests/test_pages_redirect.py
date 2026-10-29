@@ -33,10 +33,14 @@ class LegacyPagesRedirectTests(unittest.TestCase):
         self.assertIn('caches.delete(key)', script)
         self.assertIn('self.skipWaiting()', script)
         self.assertIn('self.clients.claim()', script)
-        self.assertIn('event.request.mode !== "navigate"', script)
-        self.assertIn('Response.redirect(DESTINATION, 302)', script)
+        self.assertIn('RETIRED_PAGES = self.location.hostname === "li11amy.github.io"', script)
+        self.assertIn('if(event.request.mode==="navigate")', script)
+        self.assertIn('Response.redirect(NEW_HOME,302)', script)
+        # Production copies of this same worker must retain offline/data logic.
+        self.assertIn('const CACHE="transport-bahia-v4", ROOT="/transport/"', script)
+        self.assertIn('cache.addAll(ASSETS)', script)
+        self.assertIn('ROOT+"transport_data.json"', script)
         self.assertIn(CANONICAL, script)
-        self.assertNotIn('cache.addAll(', script)
 
     def test_readme_identifies_live_architecture(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
