@@ -537,3 +537,33 @@ It refuses to republish stale day data, checks host/clean Git, preserves
 systemd updater/timer, runs tests in a separate worktree and publishes
 HTML/JSON atomically. The next 15-minute refresh regenerates the same
 sourced warning and sends the Telegram notice (if configured).
+
+## Android adaptive icon enlargement (29 October 2026)
+
+The Android launcher was using the dedicated 512 px maskable icon with a
+smaller route pictogram than the existing `icon-512-rgb.png`. The larger
+existing artwork keeps its blue background to the edge of the canvas and
+retains the entire route pictogram within the Android maskable safe circle.
+No brand shapes, colors or other assets are redrawn.
+
+One-time publishing, **primary root-scoped PWA only**:
+
+```bash
+cd /home/ubuntu/Sites/transport
+git fetch origin fix/transport-maskable-fill-20261029
+git show FETCH_HEAD:deploy/publish-larger-maskable.py | python3
+```
+
+The script checks VPS hostname, source path, clean `main` checkout, root
+manifest and expected service-worker version before changing anything.
+It atomically replaces `/srv/www/transport-pwa-root/icon-512-maskable.png`
+with the already-committed larger truecolor PNG, increments the root
+service-worker cache from v1 to v2 and root HTML manifest query from v2 to
+v3. It does not rebuild HTML/data, touch Certbot, AVÍO or Git and rolls
+back static files if an update fails.
+
+The regular `/transport/` backup path and its independent PWA remain
+unchanged. On Android, a previously installed WebAPK may need to be
+uninstalled and installed again to display the new launcher icon. Do not
+run this script on every 15-minute update. A future full root-PWA rebuild
+must preserve the new image sizing/cache version.
