@@ -27,7 +27,7 @@ python3 deploy/subdomain/build_root.py --destination "$STAGE/root-pwa"
 
 # Publish *only* new root-scoped static assets.
 sudo install -d -m 755 -o ubuntu -g ubuntu "$PUBLIC"
-for name in index.html manifest.json sw.js icon-180.png icon-192-rgb.png icon-512-rgb.png icon-512-maskable.png; do
+for name in index.html manifest.json sw.js icon-180.png icon-192-rgb.png icon-512-rgb.png icon-512-maskable.png icon-192-rgb-v2.png icon-512-rgb-v2.png icon-512-maskable-large-v2.png; do
     temp="$(mktemp "$PUBLIC/.$name.XXXXXX")"
     install -m 644 "$STAGE/root-pwa/$name" "$temp"
     mv -f "$temp" "$PUBLIC/$name"
