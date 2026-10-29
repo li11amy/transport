@@ -4,7 +4,13 @@ import unittest
 from pathlib import Path
 
 from build_horarios import HTML
-from deploy.patch_public_rail_source import patch_html, patch_file, source_block
+import importlib.util
+
+SCRIPT = Path(__file__).resolve().parents[1] / "deploy" / "patch-public-rail-source.py"
+spec = importlib.util.spec_from_file_location("patch_public_rail_source", SCRIPT)
+patcher = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(patcher)
+patch_html, patch_file, source_block = patcher.patch_html, patcher.patch_file, patcher.source_block
 
 
 class PassengerSourcePatchTests(unittest.TestCase):
