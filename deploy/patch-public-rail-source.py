@@ -52,6 +52,10 @@ def patch_file(path, template, write=False):
 
 
 def main():
+    # Running `python3 deploy/patch-public-rail-source.py` puts only deploy/
+    # on sys.path. Resolve the repository root for direct script execution.
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from build_horarios import HTML
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true", help="Actually change public shells")
