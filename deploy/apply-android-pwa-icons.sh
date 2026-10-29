@@ -5,7 +5,7 @@ set -euo pipefail
 REPO=/home/ubuntu/Sites/transport
 PUBLIC=/srv/www/transport
 BRANCH=fix/android-transport-pwa-install-20261028
-PREP=/home/ubuntu/Sites/transport-pwa-icons-stage
+PREP="/home/ubuntu/Sites/transport-pwa-icons-stage-retry-$(date +%Y%m%d-%H%M%S)-$"
 
 echo "HOST=$(hostname)"
 cd "$REPO"
@@ -49,6 +49,7 @@ page=(HTML.replace("__TRANSPORT_DATA__",j(payload["data"]))
           .replace("__SERVICE_META__",j(payload["meta"]))
           .replace("__UPDATED__",""))
 assert "manifest.json?v=2" in page
+Path("output").mkdir(parents=True,exist_ok=True)
 Path("output/pwa-install-index.html").write_text(page,encoding="utf-8")
 print("Prepared HTML without network calls",flush=True)
 PY
