@@ -60,12 +60,27 @@ expected="$(cat "$challenge")"
 
 # Test both origin Nginx and Cloudflare's public HTTP route BEFORE issuing
 # a certificate. A Cloudflare redirect or WAF challenge may prevent HTTP-01.
-origin="$(curl -fsS --max-time 12 --resolve "$DOMAIN:80:127.0.0.1" \
-  "http://$DOMAIN/.well-known/acme-challenge/$probe")"
+# Retry during initial Nginx reload/edge propagation, without issuing a
+# certificate until BOTH routes return the exact challenge file.
+origin=""
+public=""
+for attempt in 1 2 3 4 5; do
+    origin="$(curl --noproxy '*' -fsS --max-time 12 \
+      --resolve "$DOMAIN:80:127.0.0.1" \
+      "http://$DOMAIN/.well-known/acme-challenge/$probe" 2>/dev/null)" || origin=""
+    [ "$origin" = "$expected" ] && break
+    echo "Origin challenge unavailable, attempt $attempt/5"
+    sleep 2
+done
 test "$origin" = "$expected" ||
   { echo "Origin HTTP-01 probe differs; nothing issued"; exit 1; }
-public="$(curl -fsSL --max-redirs 3 --max-time 25 \
-  "http://$DOMAIN/.well-known/acme-challenge/$probe")"
+for attempt in 1 2 3 4 5; do
+    public="$(curl --noproxy '*' -fsSL --max-redirs 3 --max-time 25 \
+      "http://$DOMAIN/.well-known/acme-challenge/$probe" 2>/dev/null)" || public=""
+    [ "$public" = "$expected" ] && break
+    echo "Public Cloudflare challenge unavailable, attempt $attempt/5"
+    sleep 2
+done
 test "$public" = "$expected" || {
     echo "Cloudflare HTTP-01 probe not reachable; check HTTPS redirects/WAF"
     exit 1
