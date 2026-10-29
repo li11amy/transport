@@ -41,10 +41,8 @@ if sudo python3 deploy/subdomain/enable_https.py; then
     echo "HTTPS enabled. Smoke test:"
     curl -fsSI --max-time 15 https://transport.peluche-ebanache.com/
     curl -fsSI --max-time 15 https://transport.peluche-ebanache.com/transport_data.json
-    cd "$REPO"
-    git merge --ff-only "origin/$BRANCH"
-    git push origin main
     echo "Transport root PWA published. Original route remains a backup."
+    echo "Feature branch remains separate; existing production Git main is unchanged."
 else
     echo "Staging completed but HTTPS is NOT activated."
     echo "Check the DNS CNAME transport -> peluche-ebanache.com and HTTPS certificate."
