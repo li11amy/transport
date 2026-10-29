@@ -27,15 +27,21 @@ class SubdomainTests(unittest.TestCase):
                                 for x in manifest["icons"]))
             sw=(output/"sw.js").read_text(encoding="utf-8")
             self.assertIn('ROOT="/"',sw)
-            self.assertIn('transport-bahia-root-v2',sw)
+            self.assertIn('transport-bahia-root-v3',sw)
             html=(output/"index.html").read_text(encoding="utf-8")
             self.assertNotIn('"/transport/',html)
-            self.assertIn('rel="manifest" href="/manifest.json?v=3"',html)
+            self.assertIn('rel="manifest" href="/manifest.json?v=4"',html)
             self.assertIn('navigator.serviceWorker.register("/sw.js", {scope:"/"})',html)
             self.assertTrue((output/"icon-512-maskable.png").is_file())
             # Larger RGB artwork is deliberately used for Android maskable icon.
-            self.assertEqual((output/"icon-512-maskable.png").read_bytes(),
+            self.assertEqual((output/"icon-512-maskable-large-v2.png").read_bytes(),
                              (output/"icon-512-rgb.png").read_bytes())
+            self.assertEqual([x["src"] for x in manifest["icons"]],
+                             ["/icon-192-rgb-v2.png", "/icon-512-rgb-v2.png",
+                              "/icon-512-maskable-large-v2.png"])
+            for item in manifest["icons"]:
+                self.assertTrue((output/item["src"].lstrip("/")).is_file())
+                self.assertIn('ROOT+"'+item["src"].lstrip("/")+'"',sw)
 
     def test_original_path_scoped_pwa_is_not_changed(self):
         self.assertIn('href="/transport/manifest.json?v=2"',HTML)
