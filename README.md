@@ -506,3 +506,51 @@ After HTTPS activation, verify
 `https://transport.peluche-ebanache.com/transport_data.json`.
 Then test Chrome Android `Instalar`: only an independently launched
 standalone home-screen application counts as success.
+
+### Dedicated Let’s Encrypt certificate after initial staging (29 Oct 2026)
+
+Initial staging **succeeded**, but TLS activation refused the old
+`/etc/letsencrypt/live/peluche-ebanache.com/fullchain.pem` because it
+does **not** cover `transport.peluche-ebanache.com`. The proxied A record
+`transport → 152.228.233.184` is correct; there is no need to replace
+it with a CNAME.
+
+The follow-up bootstrap is `deploy/subdomain/issue-and-enable-https.sh`.
+Do not rerun the original `stage-and-enable.sh` or rebuild the PWA.
+
+It checks the VPS host, working folder, clean Git and prepared root assets,
+then installs a **temporary and reversible** port-80 Nginx vhost for
+`/.well-known/acme-challenge/` only. The script verifies the challenge
+file can be fetched both directly from the local Nginx and through
+Cloudflare before requesting a dedicated Let's Encrypt certificate
+with Certbot's webroot plugin. Only
+`/etc/letsencrypt/live/transport.peluche-ebanache.com/` is used for
+the new certificate: the existing main-domain certificate is untouched.
+
+After issuance, `enable_https.py` replaces the precisely identified
+temporary vhost with an HTTP/HTTPS transport vhost, and retains
+`/.well-known/acme-challenge/` on HTTP for future certificate renewals.
+A deploy hook reloads Nginx when Certbot successfully renews it.
+If challenge validation or Certbot fails, the temporary HTTP vhost is
+removed; unrelated Nginx hosts and the existing /transport/ site remain
+unchanged. Cloudflare WAF or redirect rules can block the initial HTTP-01
+check; fix the challenge route rather than force an unsafe TLS fallback.
+
+Run:
+
+```bash
+cd /home/ubuntu/Sites/transport
+git fetch origin feature/transport-root-subdomain-20261029
+git show FETCH_HEAD:deploy/subdomain/issue-and-enable-https.sh | bash
+```
+
+Certbot may ask for email/ACME account agreement if there is no already
+registered account on the VPS. Do not paste certificate private keys into
+ChatGPT. The script does not replace the main-domain certificate, does not
+modify the AVÍO website and does not touch the JSON refresh timer.
+
+After activation, validate HTTPS and Android installation, then verify
+that Certbot's existing automatic renewal timer is enabled using
+`systemctl list-timers --all | grep -Ei 'certbot|letsencrypt'`.
+The new certificate's renewal settings retain its webroot challenge and
+Nginx reload deploy hook.
