@@ -777,8 +777,17 @@ def build(data_only=False):
     try:
         meta = apply_changes(data, notify_telegram)
     except Exception as exc:
-        print("Service updates unavailable, preserving planned timetable: {}".format(exc), flush=True)
-        meta = {}
+        print("Service updates unavailable: {}".format(exc), flush=True)
+        from source_alerts import apply_source_alerts
+        now = date_now()
+        _, verified_alerts = apply_source_alerts(data, now)
+        # A source failure must never erase an independently verified strike.
+        meta = {
+            "date": now.date().isoformat(),
+            "checked_at": now.isoformat(timespec="seconds"),
+            "issues": 1, "changes": 0,
+            "official_alerts": verified_alerts,
+        }
     meta["renfe_schedule"] = train_stats
     for origin, destination in ROUTES:
         key = origin + "-" + destination
