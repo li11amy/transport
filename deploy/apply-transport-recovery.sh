@@ -89,7 +89,9 @@ temp="$(mktemp "$PUBLIC/.index.html.XXXXXX")"
 install -m 644 "$STAGE/output/pwa-recovery-index.html" "$temp"
 mv -f "$temp" "$PUBLIC/index.html"
 
-git worktree remove "$STAGE"
+# Ignored output files can make Git refuse clean worktree removal.
+# Never force-delete unknown files or block timer restart over cleanup.
+git worktree remove "$STAGE" || echo "Staging worktree retained at $STAGE; inspect later"
 sudo systemctl start transport-update.timer
 trap - EXIT
 sudo systemctl start --no-block transport-update.service
