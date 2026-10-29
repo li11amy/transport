@@ -65,7 +65,8 @@ class CertificateBootstrapTests(unittest.TestCase):
         self.assertIn('sudo certbot certonly --webroot',shell)
         self.assertIn('--cert-name "$DOMAIN"',shell)
         self.assertIn('--deploy-hook "$reload_cmd"',shell)
-        self.assertIn("curl -fsSL",shell)
+        self.assertIn("curl --noproxy '*' -fsSL",shell)
+        self.assertIn("for attempt in 1 2 3 4 5",shell)
         self.assertIn("trap cleanup EXIT",shell)
 
 
