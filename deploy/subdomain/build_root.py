@@ -24,6 +24,8 @@ def shell(data, meta):
     # Keep the original path-based PWA unchanged. Only the dedicated root
     # build refers to root-scoped assets and root service worker.
     html=html.replace('/transport/', '/')
+    # Prevent installed Android launchers from retaining old, smaller art.
+    html=html.replace('manifest.json?v=2', 'manifest.json?v=3')
     if '/transport/' in html or 'id="officialAlerts"' not in html:
         raise ValueError("Unexpected transport template: do not publish")
     return html
@@ -52,11 +54,14 @@ def prepare(public_json, destination):
     old='const CACHE="transport-bahia-v4", ROOT="/transport/";'
     if old not in sw:
         raise ValueError("Unrecognized transport service worker")
-    sw=sw.replace(old,'const CACHE="transport-bahia-root-v1", ROOT="/";')
+    sw=sw.replace(old,'const CACHE="transport-bahia-root-v2", ROOT="/";')
     (destination/"sw.js").write_text(sw,encoding="utf-8")
 
     for name in ASSETS:
-        shutil.copyfile(ROOT/name,destination/name)
+        # Android maskable safe area also contains the full-size regular
+        # route pictogram. Reuse it instead of the older reduced version.
+        original = "icon-512-rgb.png" if name == "icon-512-maskable.png" else name
+        shutil.copyfile(ROOT/original, destination/name)
     print("Prepared root-scoped installable PWA:",destination)
     print("JSON remains shared with /transport/; no duplicate timetable updater")
 
