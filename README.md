@@ -370,3 +370,43 @@ standalone app, not merely a Chrome shortcut. If it remains disabled,
 this experiment falsifies the icon-format hypothesis; the next reasonable
 diagnostic is Android Chrome version and a root-scoped subdomain staging
 site, **not** resetting production or claiming success based on desktop CI.
+
+## Recovery of interrupted PWA and maritime upgrades (29 October 2026)
+
+The Android icon-only deployment failed **before changing main** when its
+isolated source worktree did not contain `output/`; a script attempted to
+write `output/pwa-install-index.html` without creating the directory.
+The separate maritime status upgrade failed because the official CMTBC
+`/api/v2/web/estadomaritimo` JSON response started with a UTF-8 BOM,
+which `response.json()` rejected in the VPS environment.
+
+Use the combined branch `fix/transport-recovery-20261029` and its
+`deploy/apply-transport-recovery.sh` instead of repeating either older
+deployment. This version:
+
+- creates a **new isolated worktree name on every retry**, leaving both
+  older failed staging trees untouched;
+- runs offline unit regressions for the BOM response and RGB/maskable icons,
+  and validates all shell scripts;
+- creates the missing `output/` directory before rendering the HTML shell
+  from the **already published JSON**, with no upstream timetable downloads
+  or Telegram notifications in the staging step;
+- verifies live maritime API parsing without making a timetable mutation;
+- only then fast-forwards the clean production checkout and publishes
+  PWA assets and index HTML atomically;
+- keeps the public timetable JSON unchanged until the existing
+  `transport-update.service` refreshes it, and preserves the 15-minute timer;
+- never touches Nginx, the AVÍO Docker container or Git history via reset.
+
+The maritime decoder now uses
+`json.loads(response.content.decode("utf-8-sig"))`; invalid/unavailable
+official data remains a yellow warning rather than an invented cancellation.
+After deployment, inspect `output/service_change_report.json` for
+`sources.MARITIME_B042` and the public JSON `meta.maritime`. The
+`Telegram is not configured in this environment` messages from the earlier
+staged generator were expected because staging lacked the systemd environment
+file; they did not establish a failure of the live bot.
+
+The RGB icon test addresses a plausible Android WebAPK compatibility issue
+but does not prove Chrome will install the PWA. If Android still disables
+`Instalar`, the next step is an isolated root-scoped subdomain test.
