@@ -537,3 +537,119 @@ It refuses to republish stale day data, checks host/clean Git, preserves
 systemd updater/timer, runs tests in a separate worktree and publishes
 HTML/JSON atomically. The next 15-minute refresh regenerates the same
 sourced warning and sends the Telegram notice (if configured).
+
+## Root-scoped PWA on separate transport hostname (29 October 2026)
+
+Android Chrome did not permit WebAPK installation from the path-scoped
+`https://peluche-ebanache.com/transport/` app, even after RGB launcher
+icons were updated and Chromium DevTools showed no installability errors.
+A separately hosted root-scoped PWA is prepared at
+`https://transport.peluche-ebanache.com/`; the old page stays online as
+a fallback. This is a compatibility experiment, not yet verified on Android.
+
+The standalone root PWA has:
+- `manifest.json`: `id=/`, `start_url=/`, `scope=/`, RGB and
+  maskable icons at the new origin root;
+- `sw.js`: scope `/` and independent
+  `transport-bahia-root-v1` offline cache;
+- `index.html`: identical visual and service-alert logic to
+  the path-scoped page, but root-relative service-worker and assets;
+- `/transport_data.json`: **Nginx alias** to the existing
+  `/srv/www/transport/transport_data.json` from the original 15-minute
+  updater; no duplicated parser, scheduler, DB or Git commits.
+
+All independent static assets reside under
+`/srv/www/transport-pwa-root`. This is **not** the Astro AVÍO directory
+`/srv/www/avio-site`. Original `/srv/www/transport` is untouched.
+
+### DNS and TLS prerequisites
+
+Create a **proxied CNAME** in Cloudflare DNS for the zone
+`peluche-ebanache.com`:
+
+- Type `CNAME`
+- Name `transport`
+- Target `peluche-ebanache.com`
+- Proxy `Proxied`
+
+This is a separate hostname pointed at the same VPS. It must be live in
+DNS before enabling the Nginx vhost.
+
+The safe installer `deploy/subdomain/enable_https.py` also checks that
+the currently configured TLS certificate of
+`/etc/nginx/sites-available/peluche-ebanache.com` covers
+`transport.peluche-ebanache.com`. It **does not** assume that an ordinary
+single-domain certificate is a wildcard, and will refuse to change Nginx
+if the certificate does not cover the subdomain. In that case a new valid
+certificate must be obtained and the vhost installer updated accordingly.
+The existing AVÍO Nginx configuration is never overwritten.
+
+### Staging/activation
+
+On the transport VPS, with a clean main checkout:
+
+```bash
+cd /home/ubuntu/Sites/transport
+git fetch origin feature/transport-root-subdomain-20261029
+git show FETCH_HEAD:deploy/subdomain/stage-and-enable.sh | bash
+```
+
+The script checks host, working directory and Git status, creates a
+fresh isolated worktree, runs offline tests, copies only static assets into
+the independent webroot, then attempts guarded HTTPS activation.
+If DNS or matching TLS is missing, it prints the reason and **does not**
+modify Nginx or Git main. The old /transport/ app stays available.
+
+After HTTPS activation, verify
+`https://transport.peluche-ebanache.com/` and
+`https://transport.peluche-ebanache.com/transport_data.json`.
+Then test Chrome Android `Instalar`: only an independently launched
+standalone home-screen application counts as success.
+
+### Dedicated Let’s Encrypt certificate after initial staging (29 Oct 2026)
+
+Initial staging **succeeded**, but TLS activation refused the old
+`/etc/letsencrypt/live/peluche-ebanache.com/fullchain.pem` because it
+does **not** cover `transport.peluche-ebanache.com`. The proxied A record
+`transport → 152.228.233.184` is correct; there is no need to replace
+it with a CNAME.
+
+The follow-up bootstrap is `deploy/subdomain/issue-and-enable-https.sh`.
+Do not rerun the original `stage-and-enable.sh` or rebuild the PWA.
+
+It checks the VPS host, working folder, clean Git and prepared root assets,
+then installs a **temporary and reversible** port-80 Nginx vhost for
+`/.well-known/acme-challenge/` only. The script verifies the challenge
+file can be fetched both directly from the local Nginx and through
+Cloudflare before requesting a dedicated Let's Encrypt certificate
+with Certbot's webroot plugin. Only
+`/etc/letsencrypt/live/transport.peluche-ebanache.com/` is used for
+the new certificate: the existing main-domain certificate is untouched.
+
+After issuance, `enable_https.py` replaces the precisely identified
+temporary vhost with an HTTP/HTTPS transport vhost, and retains
+`/.well-known/acme-challenge/` on HTTP for future certificate renewals.
+A deploy hook reloads Nginx when Certbot successfully renews it.
+If challenge validation or Certbot fails, the temporary HTTP vhost is
+removed; unrelated Nginx hosts and the existing /transport/ site remain
+unchanged. Cloudflare WAF or redirect rules can block the initial HTTP-01
+check; fix the challenge route rather than force an unsafe TLS fallback.
+
+Run:
+
+```bash
+cd /home/ubuntu/Sites/transport
+git fetch origin feature/transport-root-subdomain-20261029
+git show FETCH_HEAD:deploy/subdomain/issue-and-enable-https.sh | bash
+```
+
+Certbot may ask for email/ACME account agreement if there is no already
+registered account on the VPS. Do not paste certificate private keys into
+ChatGPT. The script does not replace the main-domain certificate, does not
+modify the AVÍO website and does not touch the JSON refresh timer.
+
+After activation, validate HTTPS and Android installation, then verify
+that Certbot's existing automatic renewal timer is enabled using
+`systemctl list-timers --all | grep -Ei 'certbot|letsencrypt'`.
+The new certificate's renewal settings retain its webroot challenge and
+Nginx reload deploy hook.
