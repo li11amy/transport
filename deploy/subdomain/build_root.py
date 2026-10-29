@@ -7,11 +7,12 @@ Live JSON remains /srv/www/transport/transport_data.json, served by nginx alias.
 import argparse
 import json
 import shutil
+import sys
 from pathlib import Path
 
-from build_horarios import HTML
-
 ROOT=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(ROOT))
+from build_horarios import HTML
 ASSETS=("icon-180.png","icon-192-rgb.png","icon-512-rgb.png","icon-512-maskable.png")
 
 
