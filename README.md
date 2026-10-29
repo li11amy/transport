@@ -410,3 +410,31 @@ file; they did not establish a failure of the live bot.
 The RGB icon test addresses a plausible Android WebAPK compatibility issue
 but does not prove Chrome will install the PWA. If Android still disables
 `Instalar`, the next step is an isolated root-scoped subdomain test.
+
+## 29 October 2026 Renfe drivers' strike: official, date-scoped notice
+
+Renfe officially announced a 24-hour SEMAF drivers' strike on 29 October
+2026, with minimum services of 75% Cercanías at peak times, 50% off-peak,
+and a mean 65% of Media Distancia trains. Source:
+https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/10/establecidos-servicios-minimos-huelga-semaf-29-octubre
+(published 2026-10-26).
+
+**The legal minimum-service percentages are not individual cancellation
+lists.** A normal trip in static Renfe GTFS cannot automatically be assumed
+to run. `service_alerts.json` records the event as independently verified.
+`source_alerts.py` applies a yellow advisory to only the matching
+`fecha_servicio` C-1/MD trips on 2026-10-29; it never marks them red solely
+because of the strike, and preserves exact GTFS-RT cancellations and revised
+times. Only one deduplicated Telegram notice is sent for the global incident,
+and a concise source-linked headline appears above the train timetable.
+
+The alert expires after the date. Bus and ferry rows are **not** marked as
+strike-affected, as this specific action concerns Renfe drivers.
+
+One-time publication uses `deploy/publish-renfe-strike.sh`. It validates
+the existing public JSON date, then applies warnings and builds HTML from
+that already published JSON; the CMTBC/Renfe network does not have to respond.
+It refuses to republish stale day data, checks host/clean Git, preserves
+systemd updater/timer, runs tests in a separate worktree and publishes
+HTML/JSON atomically. The next 15-minute refresh regenerates the same
+sourced warning and sends the Telegram notice (if configured).
