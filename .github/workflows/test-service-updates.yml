@@ -48,3 +48,7 @@ jobs:
         continue-on-error: true
       - run: bash -n deploy/*.sh
       - run: python -m py_compile deploy/enable-nginx-transport.py
+      - name: Check subdomain certificate bootstrap scripts
+        run: |
+          bash -n deploy/subdomain/*.sh
+          python -m py_compile deploy/subdomain/*.py
