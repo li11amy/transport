@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "alerts": [
+    {
+      "id": "renfe-semaf-2026-10-29",
+      "date": "2026-10-29",
+      "type": "rail_strike",
+      "lines": ["C-1", "MD"],
+      "title": "Huelga de maquinistas de Renfe el 29/10",
+      "description": "Circulación afectada por la huelga de maquinistas (SEMAF). Cercanías: servicios mínimos del 75% en hora punta y 50% el resto; Media Distancia: 65% de media. La presencia de un tren en este horario no garantiza su circulación. Comprueba el servicio antes de viajar.",
+      "source": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/10/establecidos-servicios-minimos-huelga-semaf-29-octubre",
+      "source_published": "2026-10-26",
+      "verified": true
+    }
+  ]
+}
