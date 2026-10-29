@@ -567,3 +567,40 @@ unchanged. On Android, a previously installed WebAPK may need to be
 uninstalled and installed again to display the new launcher icon. Do not
 run this script on every 15-minute update. A future full root-PWA rebuild
 must preserve the new image sizing/cache version.
+
+## Passenger-facing Renfe messages (29 Oct 2026)
+
+Raw `https://gtfsrt.renfe.com/trip_updates*.json` URLs are for ingestion
+and diagnostics only. They **must not** appear in Telegram alerts or as
+downloadable links on the timetable. The source feed URLs are retained in
+internal records for provenance.
+
+When realtime identifies an exact train's changed arrival/departure,
+`transport_updates._passenger_rail_times` displays actual clock times and
+only the corresponding minute difference, e.g.:
+
+`Renfe · Salida 11:20 · Llegada 11:30 (+1 min)`
+
+The arrival was previously 11:29; the 11:20 departure is unchanged.
+Origin-only or destination-only updates never infer the other station's
+revised time. Cancelled trains continue to be marked red, uncertain
+delays yellow, and independently sourced strike notices are preserved.
+
+For **C-1**, Telegram and timetable point to the official public
+Renfe Cercanías realtime viewer
+`https://tiempo-real.renfe.com/?lang=es`, rather than the machine feed.
+For **MD**, the notification identifies the official Renfe data source
+without linking to a raw JSON file or suggesting a viewer that is not
+known to cover those trips. The Telegram bot sends all text notifications
+with `link_preview_options.is_disabled=true`, preventing unwanted file
+attachment-style preview cards. Other official, genuinely readable
+public news/source links are preserved.
+
+**Deployment:** `deploy/publish-passenger-alerts.sh` validates the
+source checkout and tests in a separate worktree, then fast-forwards
+main and patches only the matching source-link block in
+`/srv/www/transport/index.html` and
+`/srv/www/transport-pwa-root/index.html`, without regenerating
+full HTML or touching the published JSON. The timer is stopped only
+for the brief source update, restored and then triggered asynchronously.
+Do not deploy by pushing generated HTML to GitHub Pages.
