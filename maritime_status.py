@@ -3,6 +3,7 @@
 Do NOT assume a whole line is cancelled when the authority lists only a few
 departures. Unknown scopes are warnings, never invented red cancellations.
 """
+import json
 import re
 import unicodedata
 from datetime import datetime
@@ -173,7 +174,10 @@ def live_maritime_changes(data, now, session=None, statistics=None):
     try:
         response = http.get(STATUS_URL, timeout=12)
         response.raise_for_status()
-        changes, result = evaluate_status(data, now, response.json())
+        # CMTBC returns JSON prefixed with a UTF-8 BOM on the live VPS.
+        # requests.Response.json() rejects it in some environments.
+        payload = json.loads(response.content.decode("utf-8-sig"))
+        changes, result = evaluate_status(data, now, payload)
         diagnostics.update(result)
         diagnostics["status"] = "affected" if changes else "operational"
         if changes:
