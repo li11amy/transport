@@ -1,35 +1,134 @@
-# Horarios de transporte — El Puerto / Cádiz / Jerez
+# Horarios de transporte — El Puerto · Cádiz · Jerez
 
-Live: https://li11amy.github.io/transport/
+> **Current production architecture (29 October 2026).** The sections under
+> **Historical deployment and migration notes** are retained for context and
+> may contain obsolete commands. Use this section and the live deployment
+> scripts as the source of truth. Do not publish schedules from GitHub Pages.
 
-One production page: index.html (generated). The canonical generator is build_horarios.py in this repository.
-It reads bus/boat schedules from https://siu.cmtbc.es and official dated train schedules from Renfe static GTFS, with GTFS-RT updates. Six origin/destination views provide bus, train and ferry filters.
+## Public URLs and repository roles
+
+| URL | Role |
+| --- | --- |
+| **https://transport.peluche-ebanache.com/** | **Primary production timetable and root-scoped PWA** |
+| https://peluche-ebanache.com/transport/ | Working fallback path-scoped PWA on the same VPS |
+| https://li11amy.github.io/transport/ | Retired GitHub Pages URL; **client-side redirect** to the primary host, not an independent schedule |
+| https://github.com/li11amy/transport | Source code, tests, history, maintenance |
+
+GitHub Pages does not support an HTTP 301 from a project repository.
+`main/index.html` contains an immediate `location.replace`, a
+`meta refresh` fallback, canonical URL and a visible link. `main/404.html`
+covers older deep links. The old `main/sw.js` retires cached GitHub Pages
+timetables and redirects navigations from already-installed legacy PWAs.
+Only the **GitHub Pages copy** is replaced: **neither production VPS HTML nor
+the 15-minute updater is sourced from `main/index.html`**. The canonical
+generator is `build_horarios.py`; do **not** regenerate and commit
+`main/index.html`, as that would restore stale GitHub Pages timetables.
+The `manifest.json` in the repo remains an historical path-scoped asset,
+not the root-scoped production manifest.
+
+## How the live timetable works
+
+Six directions connect **El Puerto de Santa María, Cádiz and Jerez**.
+Filters show bus, train and catamaran; weekday tabs distinguish
+Mon–Thu, Friday, Saturday, and Sunday/holidays.
+
+- **Bus**: planned service and line notices from CMTBC
+  (`siu.cmtbc.es`). If the source fails, cached bus/boat times are
+  labelled *unverified*, not silently presented as fresh.
+- **Rail C-1 / Media Distancia**: *date-valid* official Renfe static
+  GTFS schedules, with exact-trip GTFS Realtime adjustments, station and
+  trip ID checks. Realtime cancellations are red; time changes and
+  uncertain delays are explained in the affected row. A train not flagged
+  is a **scheduled** train, not proof it will run.
+- **Catamaran B-042**: CMTBC planned departures combined with the
+  official live maritime status
+  `https://cmtbc.es/api/v2/web/estadomaritimo`. Exact, confirmed
+  cancelled departures are red. Ambiguous notices, stale/unavailable
+  sources and disruptions without uniquely identified departures
+  remain yellow, never invented cancellations.
+- **Verified broad incidents** (e.g. the 29 Oct 2026 SEMAF strike):
+  manually sourced, dated `service_alerts.json` warnings are applied
+  only to relevant trains and service dates. The notice does **not**
+  automatically cancel individual departures; Renfe's explicit realtime
+  cancellations take precedence. Expired advisories disappear by date.
+- **Colors**: red = confirmed cancellation; yellow = change, warning
+  or needs verification; unmarked = scheduled with no detected change
+  (**not** confirmation). Tap a marked departure for details and source.
+- **Telegram**: detected changes and certain source problems trigger
+  deduplicated alerts using `TELEGRAM_BOT_TOKEN`,
+  `TELEGRAM_CHAT_ID` and optional `TELEGRAM_TOPIC_ID` from the VPS
+  environment file. No secrets belong in Git.
+
+## Current hosting and update loop
+
+- **VPS**: `vps-cd9917e0`, public IP `152.228.233.184`.
+- **Git source checkout**: `/home/ubuntu/Sites/transport`, on `main`.
+- **Original public webroot**: `/srv/www/transport`.
+- **Root-scoped primary PWA HTML/assets**:
+  `/srv/www/transport-pwa-root`.
+- **Shared live data**: `/srv/www/transport/transport_data.json`;
+  primary hostname serves it under `/transport_data.json` using an
+  Nginx alias. Both public URLs show the same refreshed data.
+- **Nginx vhost**:
+  `/etc/nginx/sites-available/transport.peluche-ebanache.com`
+  (enabled by symlink). The primary hostname has a **dedicated**
+  Let's Encrypt certificate under
+  `/etc/letsencrypt/live/transport.peluche-ebanache.com/`.
+  Certbot renews it and reloads Nginx; `/.well-known/acme-challenge/`
+  stays reachable on HTTP for renewal.
+- **Recurring refresh**: `transport-update.timer` starts
+  `transport-update.service` approximately **every 15 minutes**.
+  It runs `deploy/refresh-vps-data.sh`, which calls
+  `build_horarios.py --data-only` then **atomically replaces only**
+  the public JSON. It does **not** commit/push to GitHub, publish
+  GitHub Pages, rebuild AVÍO or restart Docker.
+- The browser fetches the latest JSON on opening or returning to the
+  foreground and periodically while visible (approximately every minute).
+  The app's offline cache may contain an earlier timetable; the UI
+  warns when offline. Root and path PWA caches are separate.
+
+**Source safety before any changes:** verify host, directory and
+`git status`; do not overwrite local work, reset, pull or rebuild
+unexpected containers. The AVÍO Astro website is a different project at
+`/srv/www/avio-site`. The transport Telegram system is not in the
+AVÍO site repository. Routine diagnostic commands:
+
+```bash
+hostname
+cd /home/ubuntu/Sites/transport
+pwd
+git status --short
+systemctl status transport-update.timer --no-pager
+journalctl -u transport-update.service -n 30 --no-pager
+curl -fsSI https://transport.peluche-ebanache.com/
+curl -fsSI https://transport.peluche-ebanache.com/transport_data.json
+```
+
+To modify the primary PWA shell, use the subdomain builder under
+`deploy/subdomain/build_root.py` from the tested feature branch;
+to modify service/data logic, change the corresponding source modules
+and deploy only after validation. The subdomain initial staging and
+TLS issue scripts are **not** routine periodic update commands.
 
 ## Route and stop rules
-- El Puerto de Santa María: Plaza de Toros is preferred for buses that stop there. Otherwise display the actual stop, normalizing «Estación FC» and «Intercambiador El Pto. de Sta. María» to Estación El Puerto; source stop names are retained in the generated data.
-- Cádiz: «Plaza de Sevilla-Estación de Cádiz» displays as Estación de Cádiz.
-- Jerez: bus trips must use Estación de Jerez, except M-352 from El Puerto, displayed at Plaza del Caballo. The M-352 time is approximate (≈), inferred from the published 7-minute offset from La Granja; it is not a verified official timetable at Plaza del Caballo.
-- Day filters distinguish Monday–Thursday, Friday, Saturday and Sunday/holidays. Unknown codes are displayed in red, and diagnostics are sent to the configured Telegram chat.
 
-## Daily deployment
-On VPS vps-cd9917e0:
-- Checkout: /home/ubuntu/Sites/transport
-- Timer: transport-update.timer, 06:00 Europe/Berlin every day.
-- Unit: transport-update.service; invokes /home/ubuntu/transport-updater/update_transport.sh as ubuntu.
-- Script pulls GitHub main with fast-forward only, runs this repository's build_horarios.py, checks the generated output, copies it to index.html, then commits and pushes changes. GitHub Pages deploys from main.
-- Generated HTML: /home/ubuntu/Sites/transport/output/horarios_tres_ciudades.html; ignored in Git.
-- Diagnostic JSON and Telegram alert deduplication state: within output/, ignored in Git.
-- Telegram credentials: /home/ubuntu/.config/transport-update.env via systemd; do not commit this file.
+- El Puerto: buses prefer Plaza de Toros if the route serves it;
+  otherwise show the actual stop. Railway stop: Estación FC.
+- Cádiz: train stop at Plaza de Sevilla–Estación de Cádiz displays
+  as Estación de Cádiz.
+- Jerez: buses usually show Estación de Jerez, except M-352 from
+  El Puerto, displayed at Plaza del Caballo with its **estimated**
+  time derived from the La Granja offset.
+- Unknown timetable day codes generate diagnostics; never fabricate
+  an official operating calendar or unverified train departure.
 
-If a source table changes shape or a necessary stop is absent, the generator fails and does not overwrite index.html. An issue triggers Telegram reporting (the shell also reports a failed run). If the day code is unknown, the generator retains the trip in red and sends a warning once per unique set of issues.
+## Historical deployment and migration notes
 
-To check manually (after checking host, working directory and git status):
-    cd /home/ubuntu/Sites/transport
-    python3 build_horarios.py
-    systemctl status transport-update.timer --no-pager
-    journalctl -u transport-update.service -n 30 --no-pager
-
-Do not manually overwrite index.html without checking Git status.
+The following entries document older GitHub Pages deployments, the
+28–29 October migration, fixes and recovery steps. **Do not follow
+legacy instructions to push generated `index.html` or refresh data
+by committing into GitHub Pages.** The authoritative current operation
+is described above.
 
 ## Backups
 - Full pre-Jerez archive on workstation coredeus:
