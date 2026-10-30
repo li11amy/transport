@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Publish observational RadarDeTrenes station-board diagnostics only.
+# Publish read-only RadarDeTrenes cross-checks for existing Renfe alerts.
 # Does NOT promote Radar/Renfe board estimates into trusted live times,
-# Telegram, published HTML or operational GTFS replacement.
+# Telegram triggering, published HTML or operational GTFS replacement.
 set -euo pipefail
 REPO=/home/ubuntu/Sites/transport
 STAGE="/home/ubuntu/Sites/transport-radar-stage-$(date +%Y%m%d-%H%M%S)-$$"
@@ -46,4 +46,4 @@ trap cleanup EXIT
 sudo systemctl start --no-block transport-update.service
 echo "Secondary station-board diagnostic installed. Site remains Renfe-primary."
 echo "Inspect only after updater finishes: output/service_change_report.json"
-echo "No new passenger alerts, automatic time overrides or Git data commits."
+echo "No additional Telegram messages, automatic time overrides or Git data commits."

@@ -610,6 +610,21 @@ def apply_changes(data, sender, now=None, session=None):
     # Avoid 10 Telegram messages for the same advisory repeated in city-pair views.
     from rail_notifications import merge_trips
     rail = merge_trips(rail, now)
+    # Include meaningful, exact-station disagreements in an ALREADY eligible
+    # Renfe notification. Never send an extra Telegram ping based on Radar,
+    # and never promote its Renfe-derived estimates to confirmed ADIF times.
+    radar = statistics.get("RADAR", {})
+    if radar.get("status") in ("available", "partial"):
+        conflicts = radar.get("conflict_details", [])
+        for event in rail:
+            if event.get("line") not in ("MD", "C-1") or event["kind"] in ("cancelled", "skipped"):
+                continue
+            relevant = [item for item in conflicts
+                        if item.get("trip_id") == event.get("trip_id")
+                        and item.get("independent_adif") is False
+                        and item.get("difference_minutes", 0) > 5]
+            if relevant:
+                event["crosscheck"] = relevant[:2]
     unique = {event["id"]: event for event in rail + bus + ferry + official_events}
     notify_events(list(unique.values()), sender, now)
     report = {

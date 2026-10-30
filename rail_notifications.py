@@ -16,6 +16,11 @@ REPEAT_EARLIER_DEPARTURE_MIN = 5
 NAMES = {"cadiz": "Cádiz", "puerto": "El Puerto", "jerez": "Jerez"}
 METRICS = ("dep_late", "dep_early", "arr_late", "arr_early", "uncertain")
 ORDER = {"cancelled": 5, "skipped": 4, "inconsistent": 3, "timing": 2, "uncertain": 1}
+RADAR_STATION_PAGES = {
+    "cadiz": "https://radardetrenes.com/estacion/cadiz",
+    "puerto": "https://radardetrenes.com/estacion/el-puerto-de-santamaria",
+    "jerez": "https://radardetrenes.com/estacion/jerez-de-la-frontera",
+}
 
 
 def meaningful_departure(delta):
@@ -162,6 +167,22 @@ def format_batch(events):
         lines.append("\n• {} · {} · salida prevista {}"
                      .format(e["line"], route, e["departure"]))
         lines.append("  " + e["detail"])
+        if e.get("crosscheck"):
+            # Only fresh ESTIMATED/ACTUAL rows, same train, station and
+            # scheduled minute. Both paths ultimately cite Renfe, NOT ADIF.
+            for item in e["crosscheck"][:2]:
+                city = NAMES.get(item["city"], item["city"])
+                action = "salida" if item["event"] == "departures" else "llegada"
+                lines.append("  Datos distintos · {} {}: GTFS Renfe {}, "
+                             "RadarDeTrenes (tablero Renfe) {}"
+                             .format(action, city,
+                                     item["gtfs_time"], item["radar_time"]))
+            lines.append("  No es confirmación independiente de ADIF.")
+            cities = list(dict.fromkeys(
+                item["city"] for item in e["crosscheck"][:2]))
+            for city in cities:
+                if city in RADAR_STATION_PAGES:
+                    lines.append("  Tablero: " + RADAR_STATION_PAGES[city])
     if any(e["line"] == "C-1" for e in events):
         lines.append("\nConsultar Cercanías: https://tiempo-real.renfe.com/?lang=es")
     return "\n".join(lines)

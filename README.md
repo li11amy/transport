@@ -700,13 +700,13 @@ results. API documentation: https://radardetrenes.com/docs
 `radar_shadow.py` polls those three station boards once per live
 15-minute timetable refresh, requests at most three responses, uses a
 6-second per-source timeout and fails open for the existing site.
-It only compares **today's Media Distancia** trains with a strict composite
+It only compares **today's C-1 and Media Distancia** trains with a strict composite
 key of station code + exact five-digit train number parsed from the
-date-scoped Renfe static GTFS ID + scheduled clock time + departure/arrival
+known Renfe static GTFS ID pattern and date-scoped service row + scheduled clock time + departure/arrival
 kind. It checks source provenance and freshness (no older than 10 min)
-and records delay conflicts of at least five minutes.
+and records delay conflicts strictly greater than five minutes.
 
-Diagnostics live **only** in
+Diagnostics live in
 `output/service_change_report.json → sources.RADAR` (status,
 healthy/requested, matched, conflicts, sample train codes and delays).
 A train missing from a board's rolling window is not marked cancelled.
@@ -717,10 +717,10 @@ Never auto-promote the third-party board to a cancellation/green
 confirmation or "ADIF verified" state.
 
 The API is free and no key is required; its conditions request attribution
-to RadarDeTrenes, Renfe and ADIF for redistributed data. This stage
-redistributes no board data. If a future public feature uses it, add
-visible attribution. Consider requesting authorized ADIF Elcano feed
-access separately; its access-key-based interface is not an open public
+to RadarDeTrenes, Renfe and ADIF for redistributed data. When an existing
+Telegram alert includes a matched comparison, it cites RadarDeTrenes
+and links directly to the station's passenger-facing board. Consider
+requesting authorized ADIF Elcano feed access separately; its access-key-based interface is not an open public
 API. Only use independent-ADIF logic after provenance and train matching
 have been validated, especially for MD.
 
@@ -728,4 +728,45 @@ One-time source update: `deploy/publish-radar-shadow.sh`. This guarded
 script verifies VPS host/clean main, runs offline tests, fast-forwards
 source without discarding local changes, restores the existing 15-minute
 systemd timer and starts one refresh. No Nginx/AVÍO/rebuild/periodic Git
-commits or changes to user-facing messages.
+commits or additional Telegram messages. An existing meaningful Renfe
+alert may include a clearly attributed secondary-source comparison.
+
+## Source comparison in existing Telegram C-1 and MD alerts (30 Oct 2026)
+
+If a **significant Renfe GTFS Realtime C-1 or MD update** is already eligible for
+Telegram (departure more than 5 minutes late, any earlier departure,
+arrival more than 5 minutes early/late or an incoherent prediction), the
+existing RadarDeTrenes station-board shadow comparison can add a short
+source summary *inside that same message* when the two channels materially
+disagree. No new stand-alone notifications, extra polling, extra re-alerts
+or changes to browser timetables are introduced.
+
+To avoid false disagreements, the message only includes comparisons
+where all of the following are true:
+
+- Exact same five-digit Renfe train number, GTFS service date, station
+  code, scheduled minute and arrival/departure type (no nearest-train match).
+- Both board and individual row are fresh (not older than ten minutes).
+- Board value is explicitly `ESTIMATED` or `ACTUAL`; `SCHEDULED`
+  is **not evidence** that a train is on time. Invalid, missing and
+  logically impossible GTFS times are not compared as actual times.
+- The two reported endpoint times differ by **more than five minutes**.
+  At most two disagreements per train are shown, with real station
+  links to RadarDeTrenes and a prominent caveat that both paths
+  ultimately use Renfe data. This is **not an independent ADIF check**.
+
+Example:
+`Datos distintos · llegada El Puerto: GTFS Renfe 17:50,
+RadarDeTrenes (tablero Renfe) 17:38`
+plus a clickable `https://radardetrenes.com/estacion/el-puerto-de-santamaria`
+and the qualifier `No es confirmación independiente de ADIF.`
+
+The comparison covers **C-1 and Media Distancia** through two separately
+validated static-GTFS trip ID formats; the per-train cross-check remains read-only and may be unavailable if no matching
+realtime estimate appears on the board. Source faults must not prevent
+the normal site publication or suppress existing Renfe alerts. There are
+no misleading "Renfe on time" assertions just because a second
+board shows the published schedule.
+
+Deploy with the already guarded `deploy/publish-radar-shadow.sh` after
+the CI run succeeds. No HTML or service definitions are changed.
