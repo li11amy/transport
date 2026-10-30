@@ -238,12 +238,12 @@ class RadarShadowTests(unittest.TestCase):
         self.assertEqual(result["status"],"available")
         self.assertNotIn("cancelled",str(result).lower())
 
-    def test_no_current_md_trips_makes_no_network_calls(self):
+    def test_no_current_supported_trips_makes_no_network_calls(self):
         h=HTTP({})
         rows={"cadiz-puerto":[trip(trip_date="2026-11-02")]}
         result=radar.compare_station_boards(rows,NOW,session=h)
         self.assertEqual(result["requested"],0)
-        self.assertEqual(result["status"],"no_today_md_trips")
+        self.assertEqual(result["status"],"no_today_supported_trips")
         self.assertEqual(h.requests,[])
 
     def test_integrated_live_refresh_reports_observer_without_publishing_it(self):
