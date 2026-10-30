@@ -617,7 +617,7 @@ def apply_changes(data, sender, now=None, session=None):
     if radar.get("status") in ("available", "partial"):
         conflicts = radar.get("conflict_details", [])
         for event in rail:
-            if event.get("line") != "MD" or event["kind"] in ("cancelled", "skipped"):
+            if event.get("line") not in ("MD", "C-1") or event["kind"] in ("cancelled", "skipped"):
                 continue
             relevant = [item for item in conflicts
                         if item.get("trip_id") == event.get("trip_id")
