@@ -683,3 +683,49 @@ To publish after tests: use the guarded
 installed HTML shells before patching, retains the shared public JSON,
 fast-forwards the source checkout without discarding local changes,
 restores the 15-minute timer, and triggers the normal data refresh.
+
+## RadarDeTrenes station-board observer — not ADIF confirmation (30 Oct 2026)
+
+**Observed live on all three endpoints**:
+`https://radardetrenes.com/api/v1/stations/51405/board-renfe` (Cádiz),
+`/51400/board-renfe` (El Puerto) and `/51300/board-renfe` (Jerez).
+They return `departures`, `arrivals`, `trainCode`, `stationCode`,
+`plannedTime` (epoch milliseconds), `delayMinutes`, `updatedAt`,
+and `source: "renfe_official"`. Although RadarDeTrenes also aggregates
+some ADIF data, **these specific station feeds identify Renfe as their
+origin**. They are a secondary parsing/transport chain, **not**
+independent evidence from ADIF. Do not infer ADIF confirmation from their
+results. API documentation: https://radardetrenes.com/docs
+
+`radar_shadow.py` polls those three station boards once per live
+15-minute timetable refresh, requests at most three responses, uses a
+6-second per-source timeout and fails open for the existing site.
+It only compares **today's Media Distancia** trains with a strict composite
+key of station code + exact five-digit train number parsed from the
+date-scoped Renfe static GTFS ID + scheduled clock time + departure/arrival
+kind. It checks source provenance and freshness (no older than 10 min)
+and records delay conflicts of at least five minutes.
+
+Diagnostics live **only** in
+`output/service_change_report.json → sources.RADAR` (status,
+healthy/requested, matched, conflicts, sample train codes and delays).
+A train missing from a board's rolling window is not marked cancelled.
+`transport_data.json`, passenger times, yellow/red statuses, Telegram
+deduplication and alerts remain entirely controlled by the existing
+Renfe GTFS realtime and independently verified notices.
+Never auto-promote the third-party board to a cancellation/green
+confirmation or "ADIF verified" state.
+
+The API is free and no key is required; its conditions request attribution
+to RadarDeTrenes, Renfe and ADIF for redistributed data. This stage
+redistributes no board data. If a future public feature uses it, add
+visible attribution. Consider requesting authorized ADIF Elcano feed
+access separately; its access-key-based interface is not an open public
+API. Only use independent-ADIF logic after provenance and train matching
+have been validated, especially for MD.
+
+One-time source update: `deploy/publish-radar-shadow.sh`. This guarded
+script verifies VPS host/clean main, runs offline tests, fast-forwards
+source without discarding local changes, restores the existing 15-minute
+systemd timer and starts one refresh. No Nginx/AVÍO/rebuild/periodic Git
+commits or changes to user-facing messages.
