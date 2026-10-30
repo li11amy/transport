@@ -584,6 +584,24 @@ def apply_changes(data, sender, now=None, session=None):
     ferry, ferry_problems = live_maritime_changes(data, now, session, statistics)
     if statistics.get("MARITIME_B042", {}).get("status") != "unavailable":
         bus = [event for event in bus if event.get("line") != "B-042"]
+    # RadarDeTrenes /board-renfe identifies itself as source=renfe_official.
+    # Observational cross-processing only: NOT independent ADIF evidence.
+    # The browser/Telegram status is never changed by this check.
+    if session is None:
+        from radar_shadow import compare_station_boards
+        try:
+            statistics["RADAR"] = compare_station_boards(data, now)
+        except Exception as exc:
+            # A third-party outage must never prevent normal transport refresh.
+            statistics["RADAR"] = {
+                "mode": "shadow_only", "status": "unavailable",
+                "independent_adif": False,
+                "problem": type(exc).__name__,
+            }
+    else:
+        # Deterministic unit tests/mock sessions must not call external APIs.
+        statistics["RADAR"] = {"mode": "shadow_only", "status": "skipped_test",
+                               "independent_adif": False}
     # Source-backed incidents (including strikes) are broader than GTFS realtime.
     # Apply after RT: an explicit verified cancellation stays red.
     from source_alerts import apply_source_alerts
