@@ -106,7 +106,8 @@ class ServiceUpdateTests(unittest.TestCase):
                          updates.RENFE["MD"]: feed([])})
         events, problems = updates.rail_changes(data, NOW, http, index_loader=fake_index_loader)
         self.assertFalse(problems)
-        self.assertEqual(len(events), 1)
+        # Exact +5 minutes remain visible on the website, not in Telegram.
+        self.assertEqual(len(events), 0)
         self.assertEqual(data["puerto-cadiz"][0]["salida"], "10:00")
         self.assertEqual(data["puerto-cadiz"][0]["salida_actual"], "10:05")
         self.assertEqual(data["puerto-cadiz"][0]["llegada_actual"], "10:35")
@@ -120,7 +121,7 @@ class ServiceUpdateTests(unittest.TestCase):
         events, problems = updates.rail_changes(
             data, NOW, http, index_loader=fake_index_loader)
         self.assertFalse(problems)
-        self.assertEqual(len(events), 1)
+        self.assertEqual(len(events), 0)
         self.assertEqual(data["puerto-cadiz"][0]["salida_actual"], "10:05")
         self.assertNotIn("llegada_actual", data["puerto-cadiz"][0])
 
@@ -132,7 +133,7 @@ class ServiceUpdateTests(unittest.TestCase):
         events, problems = updates.rail_changes(
             data, NOW, http, index_loader=fake_index_loader)
         self.assertFalse(problems)
-        self.assertEqual(len(events), 1)
+        self.assertEqual(len(events), 0)
         self.assertEqual(data["puerto-cadiz"][0]["estado"], "warning")
         self.assertNotIn("salida_actual", data["puerto-cadiz"][0])
 
