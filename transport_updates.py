@@ -223,7 +223,9 @@ def _public_source_line(event):
     if url in RENFE.values():
         if event.get("line") == "C-1":
             return "Consultar Cercanías en Renfe: https://tiempo-real.renfe.com/?lang=es"
-        return "Fuente: Renfe (datos oficiales en tiempo real)"
+        # The MD GTFS endpoint is machine-readable, not a useful passenger
+        # page. Do not pretend it is a clickable human-facing source.
+        return ""
     return "Fuente: " + url if url else ""
 
 
