@@ -142,7 +142,7 @@ def compare_station_boards(data, now, session=None):
         "checked_at": now.isoformat(timespec="seconds"),
     }
     if not expected:
-        result["status"] = "no_today_md_trips"
+        result["status"] = "no_today_supported_trips"
         return result
     session = session or requests
     processed = set()
