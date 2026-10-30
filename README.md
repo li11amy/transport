@@ -704,7 +704,7 @@ It only compares **today's C-1 and Media Distancia** trains with a strict compos
 key of station code + exact five-digit train number parsed from the
 known Renfe static GTFS ID pattern and date-scoped service row + scheduled clock time + departure/arrival
 kind. It checks source provenance and freshness (no older than 10 min)
-and records delay conflicts of at least five minutes.
+and records delay conflicts strictly greater than five minutes.
 
 Diagnostics live in
 `output/service_change_report.json → sources.RADAR` (status,
@@ -717,10 +717,10 @@ Never auto-promote the third-party board to a cancellation/green
 confirmation or "ADIF verified" state.
 
 The API is free and no key is required; its conditions request attribution
-to RadarDeTrenes, Renfe and ADIF for redistributed data. This stage
-redistributes no board data. If a future public feature uses it, add
-visible attribution. Consider requesting authorized ADIF Elcano feed
-access separately; its access-key-based interface is not an open public
+to RadarDeTrenes, Renfe and ADIF for redistributed data. When an existing
+Telegram alert includes a matched comparison, it cites RadarDeTrenes
+and links directly to the station's passenger-facing board. Consider
+requesting authorized ADIF Elcano feed access separately; its access-key-based interface is not an open public
 API. Only use independent-ADIF logic after provenance and train matching
 have been validated, especially for MD.
 
@@ -728,7 +728,8 @@ One-time source update: `deploy/publish-radar-shadow.sh`. This guarded
 script verifies VPS host/clean main, runs offline tests, fast-forwards
 source without discarding local changes, restores the existing 15-minute
 systemd timer and starts one refresh. No Nginx/AVÍO/rebuild/periodic Git
-commits or changes to user-facing messages.
+commits or additional Telegram messages. An existing meaningful Renfe
+alert may include a clearly attributed secondary-source comparison.
 
 ## Source comparison in existing Telegram C-1 and MD alerts (30 Oct 2026)
 
