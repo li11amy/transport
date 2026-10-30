@@ -26,9 +26,16 @@ def patch_html(current, template):
     old = source_block(current)
     if old == new:
         return current
-    if ('source.href=t.fuente_cambio;' not in old or
-            'technicalRenfe' in old or 'Fuente' not in old):
-        raise ValueError("Published HTML differs from the expected old source block")
+    # Two known production generations are supported:
+    # 1) the first public-link patch (contains pointless MD attribution);
+    # 2) the earlier raw "Fuente" link. Never rewrite an unknown JS block.
+    recognized = ('source.href=t.fuente_cambio;' in old and
+                  'Fuente' in old and (
+                      'technicalRenfe' not in old or
+                      'source.textContent="Fuente: Renfe (datos oficiales en tiempo real)"'
+                      in old))
+    if not recognized:
+        raise ValueError("Published HTML differs from the expected source block")
     return current.replace(old, new, 1)
 
 

@@ -15,7 +15,7 @@ REPEAT_WORSENING_MIN = 10
 REPEAT_EARLIER_DEPARTURE_MIN = 5
 NAMES = {"cadiz": "Cádiz", "puerto": "El Puerto", "jerez": "Jerez"}
 METRICS = ("dep_late", "dep_early", "arr_late", "arr_early", "uncertain")
-ORDER = {"cancelled": 4, "skipped": 3, "timing": 2, "uncertain": 1}
+ORDER = {"cancelled": 5, "skipped": 4, "inconsistent": 3, "timing": 2, "uncertain": 1}
 
 
 def meaningful_departure(delta):
@@ -99,6 +99,9 @@ def merge_trips(events, now):
             group["detail"] = "Renfe · Tren cancelado"
         elif group["kind"] == "skipped":
             group["detail"] = "Renfe · Parada suprimida; comprobar paradas"
+        elif group["kind"] == "inconsistent":
+            group["checks"] = []  # No untrustworthy endpoint times.
+            group["detail"] = "Renfe · Horarios incoherentes; comprobar este tren"
         elif group["kind"] == "uncertain" and not group["checks"]:
             group["detail"] = "Renfe · Retraso en el trayecto (≥10 min); horarios de estaciones por confirmar"
         else:
@@ -119,10 +122,12 @@ def deserves_repeat(event, previous):
         return True
     kind = event["kind"]
     old_kind = previous["kind"]
-    if kind in ("cancelled", "skipped"):
-        return old_kind != kind
-    if old_kind in ("cancelled", "skipped"):
+    if old_kind in ("cancelled", "skipped") and kind not in ("cancelled", "skipped"):
         return False
+    if kind in ("cancelled", "skipped", "inconsistent"):
+        return old_kind != kind
+    if old_kind == "inconsistent":
+        return kind == "timing"
     if kind == "timing" and old_kind == "uncertain":
         return True
     if kind == "uncertain" and old_kind == "timing":
@@ -159,8 +164,6 @@ def format_batch(events):
         lines.append("  " + e["detail"])
     if any(e["line"] == "C-1" for e in events):
         lines.append("\nConsultar Cercanías: https://tiempo-real.renfe.com/?lang=es")
-    if any(e["line"] == "MD" for e in events):
-        lines.append("MD: datos oficiales de Renfe")
     return "\n".join(lines)
 
 

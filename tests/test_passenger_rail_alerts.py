@@ -41,13 +41,14 @@ class PassengerRailAlertTests(unittest.TestCase):
             if code == "C-1":
                 self.assertIn("https://tiempo-real.renfe.com/?lang=es", message)
             else:
-                self.assertIn("Fuente: Renfe", message)
+                self.assertNotIn("Fuente:", message)
+                self.assertNotIn("MD: datos oficiales", message)
                 self.assertNotIn("http", message)
 
     def test_web_panel_never_offers_raw_gtfs_json_to_passengers(self):
         self.assertIn("technicalRenfe", HTML)
         self.assertIn("Consultar Cercanías en Renfe", HTML)
-        self.assertIn("Fuente: Renfe (datos oficiales en tiempo real)", HTML)
+        self.assertNotIn('source.textContent="Fuente: Renfe (datos oficiales en tiempo real)"', HTML)
         self.assertIn("https://tiempo-real.renfe.com/?lang=es", HTML)
 
     def test_other_source_urls_are_preserved(self):

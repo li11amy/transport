@@ -542,9 +542,7 @@ function update() {
           source.textContent="Consultar Cercanías en Renfe";
           details.appendChild(source);
         } else if(technicalRenfe){
-          const source=document.createElement("span");
-          source.textContent="Fuente: Renfe (datos oficiales en tiempo real)";
-          details.appendChild(source);
+          // MD realtime JSON is not a passenger page: omit empty attribution.
         } else {
           const source=document.createElement("a");
           source.href=t.fuente_cambio;

@@ -182,6 +182,58 @@ class ServiceUpdateTests(unittest.TestCase):
         self.assertEqual(events[0]["kind"], "cancelled")
         self.assertEqual(data["puerto-cadiz"][0]["estado"], "cancelled")
 
+    def test_md_arrival_before_departure_is_warning_not_fact(self):
+        # Reproduces the reported MD 17:24 -> 16:38 (-70 min) incident
+        # using a 30-minute synthetic segment with the same defect.
+        data = {"puerto-cadiz": [trip("MD")]}
+        live = feed([stop("51405", epoch(10, 30), -70 * 60)])
+        http = FakeHttp({updates.RENFE["C-1"]: feed([]),
+                         updates.RENFE["MD"]: live})
+        stats = {}
+        events, problems = updates.rail_changes(
+            data, NOW, http, statistics=stats,
+            index_loader=fake_index_loader)
+        self.assertFalse(problems)
+        row = data["puerto-cadiz"][0]
+        self.assertEqual(row["estado"], "warning")
+        self.assertIn("horarios incoherentes", row["detalle"])
+        self.assertEqual(row["salida"], "10:00")
+        self.assertEqual(row["llegada"], "10:30")
+        self.assertNotIn("salida_actual", row)
+        self.assertNotIn("llegada_actual", row)
+        self.assertEqual(stats["MD"]["invalid_times"], 1)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["kind"], "inconsistent")
+        self.assertNotIn("09:20", events[0]["detail"])
+
+    def test_departure_update_cannot_overrun_planned_arrival(self):
+        data = {"puerto-cadiz": [trip()]}
+        live = feed([stop("51400", epoch(10, 0), 35 * 60, "departure")])
+        http = FakeHttp({updates.RENFE["C-1"]: live,
+                         updates.RENFE["MD"]: feed([])})
+        events, problems = updates.rail_changes(
+            data, NOW, http, index_loader=fake_index_loader)
+        self.assertFalse(problems)
+        self.assertEqual(data["puerto-cadiz"][0]["estado"], "warning")
+        self.assertNotIn("salida_actual", data["puerto-cadiz"][0])
+        self.assertEqual(events[0]["kind"], "inconsistent")
+
+    def test_plausible_early_arrival_and_midnight_are_preserved(self):
+        data = {"puerto-cadiz": [trip()]}
+        live = feed([stop("51405", epoch(10, 30), -6 * 60)])
+        http = FakeHttp({updates.RENFE["C-1"]: live,
+                         updates.RENFE["MD"]: feed([])})
+        events, problems = updates.rail_changes(
+            data, NOW, http, index_loader=fake_index_loader)
+        self.assertFalse(problems)
+        self.assertEqual(data["puerto-cadiz"][0]["llegada_actual"], "10:24")
+        self.assertEqual(data["puerto-cadiz"][0]["estado"], "confirmed")
+        self.assertEqual(events[0]["kind"], "timing")
+        self.assertTrue(updates._coherent_segment_times(
+            "23:58", "00:30", "00:02", "00:33"))
+        self.assertFalse(updates._coherent_segment_times(
+            "23:58", "00:30", None, "23:50"))
+
     def test_yesterdays_md_train_is_ignored(self):
         data = {"puerto-cadiz": [trip("MD")]}
         delayed = feed([stop("51400", epoch(10, 0), 180, "departure")])

@@ -178,6 +178,29 @@ def _signed_minutes(planned, revised):
     return delta - 1440 if delta > 720 else delta
 
 
+def _coherent_segment_times(planned_dep, planned_arr, revised_dep=None, revised_arr=None):
+    """Check GTFS-RT endpoint chronology against this exact GTFS segment.
+
+    Compare durations rather than simple clock strings so 23:58 → 00:30
+    remains valid. A real-time prediction must not put arrival at/before
+    departure; either one-sided prediction can cause that contradiction.
+    """
+    planned_duration = (_minutes(planned_arr) - _minutes(planned_dep)) % 1440
+    if not 0 < planned_duration < 1440:
+        return False
+    dep_delta = _signed_minutes(planned_dep, revised_dep) if revised_dep else 0
+    arr_delta = _signed_minutes(planned_arr, revised_arr) if revised_arr else 0
+    actual_duration = planned_duration + arr_delta - dep_delta
+    return 0 < actual_duration < 1440
+
+
+def _unusable_prediction(stop_update, kind, predicted):
+    """Bad explicit endpoint data is an advisory, not a missing update."""
+    return (predicted is None and isinstance(stop_update, dict)
+            and isinstance(stop_update.get(kind), dict)
+            and any(k in stop_update[kind] for k in ("time", "delay")))
+
+
 def _passenger_rail_times(planned_dep, planned_arr, actual_dep, actual_arr):
     """Explain exactly which endpoint changed; do not imply both were updated."""
     departure = actual_dep or planned_dep
@@ -200,7 +223,9 @@ def _public_source_line(event):
     if url in RENFE.values():
         if event.get("line") == "C-1":
             return "Consultar Cercanías en Renfe: https://tiempo-real.renfe.com/?lang=es"
-        return "Fuente: Renfe (datos oficiales en tiempo real)"
+        # The MD GTFS endpoint is machine-readable, not a useful passenger
+        # page. Do not pretend it is a clickable human-facing source.
+        return ""
     return "Fuente: " + url if url else ""
 
 
@@ -233,7 +258,8 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
     loader = index_loader or load_index
     for code, url in RENFE.items():
         counters = {"entities": 0, "gtfs_ids": 0, "today_ids": 0,
-                    "matched_trips": 0, "changes": 0, "advisories": 0}
+                    "matched_trips": 0, "changes": 0, "advisories": 0,
+                    "invalid_times": 0}
         if statistics is not None:
             statistics[code] = counters
         try:
@@ -294,8 +320,25 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
                 actual_arrival = _prediction(finish, "arrival",
                                              _hhmm(last["arrival"]), now)
 
-                changed_departure = actual_departure and actual_departure != trip["salida"]
-                changed_arrival = actual_arrival and actual_arrival != trip["llegada"]
+                invalid_times = (not cancelled and (
+                    _unusable_prediction(start, "departure", actual_departure)
+                    or _unusable_prediction(finish, "arrival", actual_arrival)
+                    or ((actual_departure or actual_arrival) and not
+                        _coherent_segment_times(
+                            trip["salida"], trip["llegada"],
+                            actual_departure, actual_arrival))))
+                if invalid_times:
+                    # Neither endpoint may be published as fact when the
+                    # pair is impossible. Keep both planned times in the UI.
+                    counters["invalid_times"] += 1
+                    actual_departure = actual_arrival = None
+                if cancelled:
+                    # Never publish revised times for a cancelled service.
+                    actual_departure = actual_arrival = None
+                changed_departure = (actual_departure is not None
+                                     and actual_departure != trip["salida"])
+                changed_arrival = (actual_arrival is not None
+                                   and actual_arrival != trip["llegada"])
                 relevant = any(
                     first["seq"] <= local_positions.get(str(x.get("stopId")), -1) <= last["seq"]
                     for x in updates)
@@ -312,6 +355,11 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
                 if cancelled:
                     status = "cancelled"
                     detail = "Renfe: servicio cancelado o parada suprimida"
+                elif invalid_times:
+                    status = "warning"
+                    detail = ("Renfe: horarios incoherentes; "
+                              "se muestra el horario previsto. "
+                              "Comprueba este tren antes de viajar")
                 elif changed_departure or changed_arrival:
                     status = "confirmed"
                     detail = _passenger_rail_times(
@@ -354,6 +402,7 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
                                   default=0) // 60
                 kind = ("cancelled" if relationship == "CANCELED" else
                         "skipped" if skipped else
+                        "inconsistent" if invalid_times else
                         "timing" if checks else
                         "uncertain" if status == "warning" and
                         uncertainty >= UNCERTAIN_INTERMEDIATE_MIN else None)
