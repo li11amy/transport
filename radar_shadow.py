@@ -28,9 +28,19 @@ def _clock(epoch_ms):
     return dt.date().isoformat(), dt.strftime("%H:%M")
 
 
-def _train_code(trip_id, service_date):
-    """GTFS LD ID uses five-digit train number plus variant and ISO date."""
-    match = re.fullmatch(r"(\d{5})\d" + re.escape(service_date), str(trip_id))
+def _train_code(trip_id, service_date, line="MD"):
+    """Only known exact Renfe GTFS ID patterns, never nearest train.
+
+    MD: 1303122026-10-30  -> 13031 (one variant digit and exact date).
+    C-1: 3102V23200C1    -> 23200 (four digits + day-code prefix).
+    C-1 service dates are checked on the surrounding GTFS row.
+    """
+    if line == "MD":
+        match = re.fullmatch(r"(\d{5})\d" + re.escape(service_date), str(trip_id))
+    elif line == "C-1":
+        match = re.fullmatch(r"\d{4}[A-Z](\d{5})C1", str(trip_id))
+    else:
+        return None
     return match.group(1) if match else None
 
 
@@ -41,15 +51,17 @@ def _minutes(a, b):
 
 
 def _expected_trips(data, day):
-    """Only exact MD train, stop, date and planned time (never nearest train)."""
+    """Only exact C-1/MD train, stop, date and planned time (no guesses)."""
     out = {}
     for route, entries in data.items():
         origin, destination = route.split("-")
         for trip in entries:
-            if (trip.get("tipo") != "tren" or trip.get("linea") != "MD"
+            if (trip.get("tipo") != "tren"
+                    or trip.get("linea") not in ("MD", "C-1")
                     or trip.get("fecha_servicio") != day):
                 continue
-            train_code = _train_code(trip.get("trip_id", ""), day)
+            train_code = _train_code(
+                trip.get("trip_id", ""), day, trip["linea"])
             if not train_code:
                 continue
             for city, kind, planned, actual in (
