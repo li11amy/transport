@@ -110,6 +110,20 @@ class RenfeSpamTests(unittest.TestCase):
                 updates.notify_events(worse,lambda x:messages.append(x) or True,NOW)
                 self.assertEqual(len(messages),2)
 
+    def test_two_distinct_trains_send_one_telegram_batch(self):
+        first=sample("cadiz-jerez")
+        second=sample("puerto-jerez")
+        second["trip_id"]="SECOND_TRAIN"
+        second["id"]="rail:2026-10-30:C-1:SECOND_TRAIN"
+        alerts=merge_trips([first,second],NOW)
+        self.assertEqual(len(alerts),2)
+        messages=[]
+        with tempfile.TemporaryDirectory() as td:
+            with patch.object(updates,"STATE_FILE",Path(td)/"sent.json"):
+                updates.notify_events(alerts,lambda x:messages.append(x) or True,NOW)
+        self.assertEqual(len(messages),1)
+        self.assertEqual(messages[0].count("C-1"),2)
+
     def test_failed_send_does_not_mark_as_sent(self):
         messages=[]
         with tempfile.TemporaryDirectory() as td:
