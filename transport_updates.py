@@ -299,13 +299,16 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
                 relevant = any(
                     first["seq"] <= local_positions.get(str(x.get("stopId")), -1) <= last["seq"]
                     for x in updates)
-                delayed = any(
-                    first["seq"] <= local_positions.get(str(x.get("stopId")), -1) <= last["seq"]
-                    and abs(int(event.get("delay", 0))) >= 60
+                intermediate_delays = [
+                    int(event.get("delay", 0))
                     for x in updates
+                    if first["seq"] <= local_positions.get(
+                        str(x.get("stopId")), -1) <= last["seq"]
                     for event in (x.get("arrival"), x.get("departure"))
-                    if isinstance(event, dict)
-                )
+                    if isinstance(event, dict) and
+                       str(event.get("delay", "0")).lstrip("-").isdigit()
+                ]
+                delayed = any(abs(delay) >= 60 for delay in intermediate_delays)
                 if cancelled:
                     status = "cancelled"
                     detail = "Renfe: servicio cancelado o parada suprimida"
@@ -330,11 +333,65 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
                 if changed_arrival:
                     trip["llegada_actual"] = actual_arrival
                 counters["changes" if status != "warning" else "advisories"] += 1
-                events.append({
-                    "id": "rail:{}:{}:{}".format(now.date().isoformat(), route, trip_id),
-                    "route": route, "line": code, "detail": detail, "source": url,
-                    "date": now.date().isoformat(),
-                })
+                # Keep every source-confirmed minor time update in the
+                # public JSON, but apply a stricter Telegram-only threshold.
+                from rail_notifications import (
+                    meaningful_departure, meaningful_arrival,
+                    build_stop_changes, UNCERTAIN_INTERMEDIATE_MIN)
+                departure_delta = (
+                    _signed_minutes(trip["salida"], actual_departure)
+                    if changed_departure else 0)
+                arrival_delta = (
+                    _signed_minutes(trip["llegada"], actual_arrival)
+                    if changed_arrival else 0)
+                checks = build_stop_changes(
+                    origin=route.split("-")[0],
+                    destination=route.split("-")[1],
+                    actual_departure=actual_departure,
+                    actual_arrival=actual_arrival,
+                    departure_delta=departure_delta, arrival_delta=arrival_delta)
+                uncertainty = max([x for x in intermediate_delays if x > 0],
+                                  default=0) // 60
+                kind = ("cancelled" if relationship == "CANCELED" else
+                        "skipped" if skipped else
+                        "timing" if checks else
+                        "uncertain" if status == "warning" and
+                        uncertainty >= UNCERTAIN_INTERMEDIATE_MIN else None)
+                if kind:
+                    origin, destination = route.split("-")
+                    latest_end = datetime.combine(
+                        now.date(),
+                        datetime.strptime(
+                            actual_arrival or trip["llegada"], "%H:%M").time(),
+                        tzinfo=MADRID)
+                    if _minutes(actual_arrival or trip["llegada"]) < _minutes(
+                            trip["salida"]):
+                        latest_end += timedelta(days=1)
+                    events.append({
+                        "id": "rail:{}:{}:{}".format(now.date().isoformat(), code, trip_id),
+                        "trip_id": trip_id,
+                        "route": route, "line": code,
+                        "detail": detail, "source": url,
+                        "date": now.date().isoformat(), "kind": kind,
+                        "latest_end": latest_end,
+                        "segment": {
+                            "origin": origin, "destination": destination,
+                            "first_seq": first["seq"], "last_seq": last["seq"],
+                            "planned_departure": trip["salida"],
+                        },
+                        "checks": checks,
+                        "metrics": {
+                            "dep_late": max(departure_delta, 0) if
+                                meaningful_departure(departure_delta) else 0,
+                            "dep_early": max(-departure_delta, 0) if
+                                meaningful_departure(departure_delta) else 0,
+                            "arr_late": max(arrival_delta, 0) if
+                                meaningful_arrival(arrival_delta) else 0,
+                            "arr_early": max(-arrival_delta, 0) if
+                                meaningful_arrival(arrival_delta) else 0,
+                            "uncertain": uncertainty if kind == "uncertain" else 0,
+                        },
+                    })
     return events, problems
 
 
@@ -425,17 +482,44 @@ def notify_events(events, sender, now):
     if not isinstance(state.get("sent"), dict):
         state = {"sent": {}}
     sent = state["sent"]
+    from rail_notifications import (
+        deserves_repeat, sent_record, format_batch, batches, legacy_rail_sent)
+    new_rail = []
     for event in events:
-        # The publication date of a persistent bus notice is NOT a new event.
-        # Only its ID, detail and source determine whether to send again.
+        if not event.get("trip_id"):
+            continue
+        previous = sent.get(event["id"])
+        if previous is None and event["kind"] not in ("cancelled", "skipped") \
+                and legacy_rail_sent(sent, event):
+            # Same train was already reported using the old per-route IDs.
+            # Treat its current severity as the initial baseline.
+            sent[event["id"]] = sent_record(event, now)
+            continue
+        if deserves_repeat(event, previous):
+            new_rail.append(event)
+
+    # One Telegram notification per update batch, with several train entries.
+    # Update sent state only after a successful Telegram request.
+    for batch in batches(new_rail):
+        try:
+            if sender(format_batch(batch)):
+                for event in batch:
+                    sent[event["id"]] = sent_record(event, now)
+        except Exception as exc:
+            print("Transport rail alert failed: {}".format(exc), flush=True)
+
+    for event in events:
+        if event.get("trip_id"):
+            continue
+        # Bus/ferry notices and official incident summaries retain their
+        # established signature-based deduplication.
         signature = {k: v for k, v in event.items() if k != "date"}
         digest = hashlib.sha256(
             json.dumps(signature, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
         if sent.get(event["id"]) == digest:
             continue
-        message = format_notification(event)
         try:
-            if sender(message):
+            if sender(format_notification(event)):
                 sent[event["id"]] = digest
         except Exception as exc:
             print("Transport change alert failed: {}".format(exc), flush=True)
@@ -457,6 +541,8 @@ def apply_changes(data, sender, now=None, session=None):
     official_events, official_summaries = apply_source_alerts(data, now)
     # The maritime JSON is more authoritative for B-042 than news headlines.
     # Avoid 10 Telegram messages for the same advisory repeated in city-pair views.
+    from rail_notifications import merge_trips
+    rail = merge_trips(rail, now)
     unique = {event["id"]: event for event in rail + bus + ferry + official_events}
     notify_events(list(unique.values()), sender, now)
     report = {
