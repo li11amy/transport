@@ -162,6 +162,17 @@ def format_batch(events):
         lines.append("\n• {} · {} · salida prevista {}"
                      .format(e["line"], route, e["departure"]))
         lines.append("  " + e["detail"])
+        if e.get("crosscheck"):
+            # Only fresh ESTIMATED/ACTUAL rows, same train, station and
+            # scheduled minute. Both paths ultimately cite Renfe, NOT ADIF.
+            for item in e["crosscheck"][:2]:
+                city = NAMES.get(item["city"], item["city"])
+                action = "salida" if item["event"] == "departures" else "llegada"
+                lines.append("  Datos distintos · {} {}: GTFS Renfe {}, "
+                             "RadarDeTrenes (tablero Renfe) {}"
+                             .format(action, city,
+                                     item["gtfs_time"], item["radar_time"]))
+            lines.append("  No es confirmación independiente de ADIF.")
     if any(e["line"] == "C-1" for e in events):
         lines.append("\nConsultar Cercanías: https://tiempo-real.renfe.com/?lang=es")
     return "\n".join(lines)
