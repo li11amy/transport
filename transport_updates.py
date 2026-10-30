@@ -611,7 +611,7 @@ def apply_changes(data, sender, now=None, session=None):
     from rail_notifications import merge_trips
     rail = merge_trips(rail, now)
     # Include meaningful, exact-station disagreements in an ALREADY eligible
-    # MD notification. Never send an extra Telegram ping based on Radar,
+    # Renfe notification. Never send an extra Telegram ping based on Radar,
     # and never promote its Renfe-derived estimates to confirmed ADIF times.
     radar = statistics.get("RADAR", {})
     if radar.get("status") in ("available", "partial"):
