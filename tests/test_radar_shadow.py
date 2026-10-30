@@ -202,6 +202,7 @@ class RadarShadowTests(unittest.TestCase):
                 self.assertIn("GTFS Renfe 17:50",text)
                 self.assertIn("RadarDeTrenes (tablero Renfe) 17:38",text)
                 self.assertIn("No es confirmación independiente de ADIF",text)
+                self.assertIn("https://radardetrenes.com/estacion/el-puerto-de-santamaria",text)
                 self.assertEqual(data,before)
 
     def test_no_train_in_short_window_is_not_cancelled(self):
