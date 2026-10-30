@@ -178,6 +178,33 @@ def _signed_minutes(planned, revised):
     return delta - 1440 if delta > 720 else delta
 
 
+def plausible_segment_arrival(planned_dep, planned_arr, actual_dep, actual_arr):
+    """Never present arrival before a train could have left the segment.
+
+    Local clocks may cross midnight. A one-day rollover is valid only when
+    the scheduled trip also crosses midnight; otherwise an earlier clock
+    time at destination is not evidence of a next-day arrival. An updated
+    departure explicitly sourced at the origin may move the start earlier.
+    """
+    if actual_arr is None:
+        return True
+    start = actual_dep or planned_dep
+    scheduled_duration = (_minutes(planned_arr) - _minutes(planned_dep)) % 1440
+    if not 0 < scheduled_duration < 720:
+        return False
+
+    # Infer relative clock day from scheduled times and an explicitly
+    # verified departure. Do not turn a nonsensical -70 minute arrival into
+    # an apparent 23-hour journey by wrapping modulo 24 hours.
+    duration = (_minutes(actual_arr) - _minutes(start)) % 1440
+    # More than 180 minutes *additional* time needs independent verification.
+    # For short regional segments, taking less than half the scheduled
+    # duration is likewise suspect; a single stop prediction is not enough.
+    minimum = max(2, (scheduled_duration + 1) // 2)
+    maximum = min(720, scheduled_duration + 180)
+    return minimum <= duration <= maximum
+
+
 def _passenger_rail_times(planned_dep, planned_arr, actual_dep, actual_arr):
     """Explain exactly which endpoint changed; do not imply both were updated."""
     departure = actual_dep or planned_dep
@@ -293,6 +320,18 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
                                                _hhmm(first["departure"]), now)
                 actual_arrival = _prediction(finish, "arrival",
                                              _hhmm(last["arrival"]), now)
+                invalid_arrival = (not cancelled and actual_arrival is not None
+                                   and not plausible_segment_arrival(
+                                       trip["salida"], trip["llegada"],
+                                       actual_departure, actual_arrival))
+                if invalid_arrival:
+                    print(
+                        "Renfe {} {} {}: discarded impossible arrival {} "
+                        "(scheduled {} → {}; departure update {})".format(
+                            code, trip_id, route, actual_arrival,
+                            trip["salida"], trip["llegada"], actual_departure),
+                        flush=True)
+                    actual_arrival = None
 
                 changed_departure = actual_departure and actual_departure != trip["salida"]
                 changed_arrival = actual_arrival and actual_arrival != trip["llegada"]
@@ -318,12 +357,17 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
                         trip["salida"], trip["llegada"],
                         actual_departure if changed_departure else None,
                         actual_arrival if changed_arrival else None)
+                elif invalid_arrival:
+                    status = "warning"
+                    detail = "Renfe: predicción de llegada incoherente; horario pendiente de confirmar"
                 elif delayed and relevant:
                     status = "warning"
                     detail = "Renfe: retraso comunicado en una parada del trayecto; horario pendiente de confirmar"
                 else:
                     continue
 
+                if invalid_arrival and status == "confirmed":
+                    detail += " · Llegada sin confirmar (predicción incoherente)"
                 trip.update({
                     "estado": status, "detalle": detail, "fuente_cambio": url,
                     "fecha_cambio": now.date().isoformat(), "trip_id": trip_id,
@@ -356,6 +400,7 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
                         "skipped" if skipped else
                         "timing" if checks else
                         "uncertain" if status == "warning" and
+                        not invalid_arrival and
                         uncertainty >= UNCERTAIN_INTERMEDIATE_MIN else None)
                 if kind:
                     origin, destination = route.split("-")
