@@ -57,7 +57,7 @@ def _expected_trips(data, day):
                 (destination, "arrivals", trip["llegada"], trip.get("llegada_actual")),
             ):
                 key = (STATIONS[city], kind, train_code, planned)
-                out.setdefault(key, set()).add(actual)
+                out.setdefault(key, set()).add((trip["trip_id"], actual))
     return out
 
 
@@ -85,12 +85,24 @@ def _parse_board(payload, station, now):
             code = item.get("trainCode")
             if not isinstance(code, str) or not re.fullmatch(r"\d{5}", code):
                 continue
+            # SCHEDULED is NOT an independent realtime "on time" report.
+            # Only actual/estimated times may disagree with GTFS realtime.
+            if item.get("timeType") not in ("ESTIMATED", "ACTUAL"):
+                continue
             try:
                 date, hhmm = _clock(item.get("plannedTime"))
                 delay = item.get("delayMinutes")
                 if isinstance(delay, bool) or not isinstance(delay, (int, float)):
                     continue
                 if not (-180 <= delay <= 180):
+                    continue
+                # An individually old record must not be rescued by a fresh
+                # board wrapper timestamp.
+                row_updated = item.get("timestamp")
+                if isinstance(row_updated, bool) or not isinstance(row_updated, (int, float)):
+                    continue
+                row_age = now.timestamp() - row_updated / 1000
+                if not (-60 <= row_age <= STALE_AFTER_SECONDS):
                     continue
             except (ValueError, OverflowError, OSError):
                 continue
@@ -114,7 +126,7 @@ def compare_station_boards(data, now, session=None):
         "independent_adif": False,
         "provider": "RadarDeTrenes", "requested": 0, "healthy": 0,
         "matched": 0, "conflicts": 0, "unmatched": 0,
-        "problems": [], "examples": [],
+        "problems": [], "examples": [], "conflict_details": [],
         "checked_at": now.isoformat(timespec="seconds"),
     }
     if not expected:
@@ -148,12 +160,16 @@ def compare_station_boards(data, now, session=None):
                 continue
             result["matched"] += 1
             actuals = expected[key]
-            if len(actuals) != 1 or None in actuals:
-                # Unknown/ambiguous live time cannot be compared as fact.
+            if len(actuals) != 1:
+                # Two trips with the same train code/time are ambiguous.
                 continue
-            actual = next(iter(actuals))
+            trip_id, actual = next(iter(actuals))
+            if actual is None:
+                # Invalid GTFS times remain yellow, without comparing a
+                # missing prediction to Radar's possibly scheduled times.
+                continue
             own_delay = _minutes(planned, actual)
-            if abs(own_delay - delay) >= 5:
+            if abs(own_delay - delay) > 5:
                 result["conflicts"] += 1
                 if len(result["examples"]) < MAX_SAMPLE:
                     result["examples"].append({
@@ -161,6 +177,21 @@ def compare_station_boards(data, now, session=None):
                         "train": code, "scheduled": planned,
                         "renfe_gtfs_delay": own_delay,
                         "radar_board_delay": delay,
+                    })
+                if len(result["conflict_details"]) < 20:
+                    board_minutes = (int(planned[:2]) * 60 +
+                                     int(planned[3:]) + delay) % 1440
+                    result["conflict_details"].append({
+                        "trip_id": trip_id, "station": station,
+                        "city": next(city for city, code in STATIONS.items()
+                                     if code == station),
+                        "event": kind, "scheduled": planned,
+                        "gtfs_time": actual,
+                        "radar_time": "{:02d}:{:02d}".format(
+                            board_minutes // 60, board_minutes % 60),
+                        "difference_minutes": abs(own_delay - delay),
+                        "secondary_source": "RadarDeTrenes (datos Renfe)",
+                        "independent_adif": False,
                     })
     result["status"] = (
         "available" if result["healthy"] == len(STATIONS)
