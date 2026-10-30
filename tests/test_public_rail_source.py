@@ -31,6 +31,20 @@ class PassengerSourcePatchTests(unittest.TestCase):
         self.assertEqual(result, "head\n" + new + "      extra.appendChild(details);\nfoot")
         self.assertEqual(patch_html(result, HTML), result)
 
+    def test_remove_meaningless_md_source_from_already_patched_public_html(self):
+        current = source_block(HTML).replace(
+            '        } else if(technicalRenfe){\n'
+            '          // MD realtime JSON is not a passenger page: omit empty attribution.\n',
+            '        } else if(technicalRenfe){\n'
+            '          const source=document.createElement("span");\n'
+            '          source.textContent="Fuente: Renfe (datos oficiales en tiempo real)";\n'
+            '          details.appendChild(source);\n')
+        self.assertIn("datos oficiales en tiempo real",current)
+        old_page="header\n"+current+"      extra.appendChild(details);\nfooter"
+        patched=patch_html(old_page,HTML)
+        self.assertNotIn("datos oficiales en tiempo real",patched)
+        self.assertEqual(patch_html(patched,HTML),patched)
+
     def test_refuse_unrecognized_public_html(self):
         with self.assertRaises((ValueError, IndexError)):
             patch_html("other completely different content", HTML)
