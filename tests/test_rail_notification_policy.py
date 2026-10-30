@@ -73,6 +73,33 @@ class RenfeSpamTests(unittest.TestCase):
         self.assertEqual(msg.count("C-1"),1)
         self.assertIn("Cádiz → Jerez",msg)
 
+    def test_md_incoherent_prediction_is_warning_without_false_time_or_source(self):
+        row=sample("cadiz-puerto", arrival_delta=0, kind="inconsistent")
+        row["line"]="MD"
+        row["checks"]=[]
+        row["id"]="rail:2026-10-30:MD:BAD_PREDICTION"
+        row["trip_id"]="BAD_PREDICTION"
+        merged=merge_trips([row],NOW)
+        self.assertEqual(merged[0]["kind"],"inconsistent")
+        self.assertEqual(merged[0]["detail"],
+            "Renfe · Horarios incoherentes; comprobar este tren")
+        text=format_batch(merged)
+        self.assertIn("comprobar este tren",text)
+        self.assertNotIn("datos oficiales",text)
+        self.assertNotIn("16:38",text)
+        self.assertNotIn("gtfsrt",text)
+
+    def test_incoherent_warning_once_then_notify_when_corrected(self):
+        row=sample("cadiz-puerto", arrival_delta=0, kind="inconsistent")
+        row["checks"]=[]
+        bad=merge_trips([row],NOW)[0]
+        self.assertTrue(deserves_repeat(bad,None))
+        self.assertFalse(deserves_repeat(bad,sent_record(bad,NOW)))
+        corrected=merge_trips([sample("cadiz-puerto",arrival_delta=6)],NOW)[0]
+        self.assertTrue(deserves_repeat(corrected,sent_record(bad,NOW)))
+        cancelled=merge_trips([sample("cadiz-puerto",kind="cancelled")],NOW)[0]
+        self.assertTrue(deserves_repeat(cancelled,sent_record(bad,NOW)))
+
     def test_no_alert_for_finished_train(self):
         self.assertEqual(merge_trips([sample("cadiz-jerez",finished=True)],NOW),[])
 
