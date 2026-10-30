@@ -182,6 +182,69 @@ class ServiceUpdateTests(unittest.TestCase):
         self.assertEqual(events[0]["kind"], "cancelled")
         self.assertEqual(data["puerto-cadiz"][0]["estado"], "cancelled")
 
+    def test_md_impossible_70_min_early_arrival_is_not_a_fact_or_telegram_alert(self):
+        # Live incident 30 Oct: MD Cádiz 17:24 -> El Puerto 17:48, but
+        # GTFS-RT reported 16:38 at destination (-70 min).
+        # A train cannot arrive before its unmodified 17:24 departure.
+        from datetime import datetime
+        now = datetime(2026, 10, 28, 17, 45, tzinfo=TZ)
+        def md_index(code, when):
+            index = static_index(first="51405", last="51400")
+            stops = index["trips"]["RENFE_TEST"]["stops"]
+            stops[0]["departure"] = "17:24:00"
+            stops[1]["arrival"] = "17:48:00"
+            return index, None
+
+        trip_row = trip(line="MD", departure="17:24", arrival="17:48")
+        trip_row["parada_salida"] = "Estación de Cádiz"
+        trip_row["parada_llegada"] = "Estación FC"
+        data = {"cadiz-puerto": [trip_row]}
+        early_at_destination = feed([
+            stop("51400", epoch(17, 48), -70 * 60)
+        ], timestamp=int(now.timestamp()))
+        http = FakeHttp({updates.RENFE["C-1"]: feed([], timestamp=int(now.timestamp())),
+                         updates.RENFE["MD"]: early_at_destination})
+        events, problems = updates.rail_changes(
+            data, now, http, index_loader=md_index)
+        self.assertFalse(problems)
+        self.assertEqual(events, [])
+        self.assertEqual(trip_row["estado"], "warning")
+        self.assertNotIn("llegada_actual", trip_row)
+        self.assertIn("incoherente", trip_row["detalle"])
+        self.assertEqual(trip_row["llegada"], "17:48")
+
+    def test_md_valid_delayed_arrival_still_notifies(self):
+        from datetime import datetime
+        now = datetime(2026, 10, 28, 17, 45, tzinfo=TZ)
+        index = static_index(first="51405",last="51400")
+        index["trips"]["RENFE_TEST"]["stops"][0]["departure"] = "17:24:00"
+        index["trips"]["RENFE_TEST"]["stops"][1]["arrival"] = "17:48:00"
+        row = trip(line="MD", departure="17:24", arrival="17:48")
+        data = {"cadiz-puerto": [row]}
+        forecast = feed([stop("51400", epoch(17, 48), 6 * 60)],
+                        timestamp=int(now.timestamp()))
+        http = FakeHttp({updates.RENFE["C-1"]: feed([], timestamp=int(now.timestamp())),
+                         updates.RENFE["MD"]: forecast})
+        events, problems = updates.rail_changes(
+            data, now, http, index_loader=lambda code, time: (index,None))
+        self.assertFalse(problems)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["metrics"]["arr_late"], 6)
+        self.assertEqual(row["llegada_actual"], "17:54")
+        self.assertEqual(row["estado"], "confirmed")
+
+    def test_segment_validation_overnight_and_legitimate_early_departure(self):
+        self.assertFalse(updates.plausible_segment_arrival(
+            "17:24", "17:48", None, "16:38"))
+        self.assertTrue(updates.plausible_segment_arrival(
+            "17:24", "17:48", "16:20", "16:38"))
+        self.assertTrue(updates.plausible_segment_arrival(
+            "23:50", "00:15", None, "00:20"))
+        self.assertFalse(updates.plausible_segment_arrival(
+            "23:50", "00:15", None, "23:10"))
+        self.assertFalse(updates.plausible_segment_arrival(
+            "17:24", "17:48", None, "17:25"))
+
     def test_yesterdays_md_train_is_ignored(self):
         data = {"puerto-cadiz": [trip("MD")]}
         delayed = feed([stop("51400", epoch(10, 0), 180, "departure")])
