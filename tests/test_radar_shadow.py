@@ -117,6 +117,9 @@ class RadarShadowTests(unittest.TestCase):
         self.assertIsNone(radar._train_code("1303122026-10-29",DAY))
         self.assertIsNone(radar._train_code("RENFE_TEST",DAY))
         self.assertIsNone(radar._train_code("1303102026-10-30wrong",DAY))
+        self.assertEqual(radar._train_code("3102V23200C1",DAY,"C-1"),"23200")
+        self.assertIsNone(radar._train_code("3102V23200C1",DAY,"MD"))
+        self.assertIsNone(radar._train_code("3102V23200C2",DAY,"C-1"))
 
     def test_stale_and_mislabeled_provider_cannot_verify(self):
         u=urls()
@@ -133,6 +136,26 @@ class RadarShadowTests(unittest.TestCase):
         self.assertEqual(result["healthy"],1)
         self.assertEqual(len(result["problems"]),2)
         self.assertFalse(result["independent_adif"])
+
+    def test_c1_real_gtfs_trip_id_joins_exact_train_and_station(self):
+        c1=trip(actual="17:47")
+        c1["linea"]="C-1"
+        c1["trip_id"]="3102V23200C1"
+        data={"cadiz-puerto":[c1]}
+        u=urls()
+        h=HTTP({
+            u["51405"]:board("51405"),
+            u["51400"]:board("51400",arrivals=[
+                entry("51400","23200",17,38,0),
+                entry("51400","23201",17,38,0),
+            ]),
+            u["51300"]:board("51300"),
+        })
+        result=radar.compare_station_boards(data,NOW,session=h)
+        self.assertEqual(result["matched"],1)
+        self.assertEqual(result["conflicts"],1)
+        self.assertEqual(result["conflict_details"][0]["trip_id"],"3102V23200C1")
+        self.assertEqual(result["conflict_details"][0]["difference_minutes"],9)
 
     def test_scheduled_only_is_not_a_false_conflict(self):
         u=urls()
