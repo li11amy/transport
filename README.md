@@ -730,9 +730,9 @@ source without discarding local changes, restores the existing 15-minute
 systemd timer and starts one refresh. No Nginx/AVÍO/rebuild/periodic Git
 commits or changes to user-facing messages.
 
-## Source comparison in existing Telegram MD alerts (30 Oct 2026)
+## Source comparison in existing Telegram C-1 and MD alerts (30 Oct 2026)
 
-If a **significant Renfe GTFS Realtime MD update** is already eligible for
+If a **significant Renfe GTFS Realtime C-1 or MD update** is already eligible for
 Telegram (departure more than 5 minutes late, any earlier departure,
 arrival more than 5 minutes early/late or an incoherent prediction), the
 existing RadarDeTrenes station-board shadow comparison can add a short
@@ -743,7 +743,7 @@ or changes to browser timetables are introduced.
 To avoid false disagreements, the message only includes comparisons
 where all of the following are true:
 
-- Exact same five-digit MD train number, GTFS service date, station
+- Exact same five-digit Renfe train number, GTFS service date, station
   code, scheduled minute and arrival/departure type (no nearest-train match).
 - Both board and individual row are fresh (not older than ten minutes).
 - Board value is explicitly `ESTIMATED` or `ACTUAL`; `SCHEDULED`
@@ -760,8 +760,8 @@ RadarDeTrenes (tablero Renfe) 17:38`
 plus a clickable `https://radardetrenes.com/estacion/el-puerto-de-santamaria`
 and the qualifier `No es confirmación independiente de ADIF.`
 
-The comparison currently covers **Media Distancia only**; the per-train
-cross-check remains read-only and may be unavailable if no matching
+The comparison covers **C-1 and Media Distancia** through two separately
+validated static-GTFS trip ID formats; the per-train cross-check remains read-only and may be unavailable if no matching
 realtime estimate appears on the board. Source faults must not prevent
 the normal site publication or suppress existing Renfe alerts. There are
 no misleading "Renfe on time" assertions just because a second
