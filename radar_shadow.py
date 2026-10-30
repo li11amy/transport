@@ -2,7 +2,8 @@
 
 IMPORTANT: live /board-renfe payloads declare source="renfe_official".
 These are a SECOND PROCESSING PATH, not independent ADIF verification.
-Never overwrite passenger times, cancellations, colours or Telegram alerts.
+Never overwrite passenger times, cancellations or colours. A matched
+comparison can annotate EXISTING Renfe alerts, but never trigger new ones.
 Three inexpensive requests per normal timetable refresh (15 min).
 """
 from datetime import datetime, timedelta, timezone
