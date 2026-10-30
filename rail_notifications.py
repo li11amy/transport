@@ -129,6 +129,9 @@ def deserves_repeat(event, previous):
         return False
     current = event["metrics"]
     old = previous.get("metrics", {})
+    if current.get("dep_early", 0) > 0 and old.get("dep_early", 0) == 0:
+        # Even a one-minute newly EARLIER departure can cause a missed train.
+        return True
     return any(
         current.get(field, 0) >= old.get(field, 0) +
             (REPEAT_EARLIER_DEPARTURE_MIN if field == "dep_early"
