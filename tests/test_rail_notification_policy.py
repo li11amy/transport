@@ -151,6 +151,22 @@ class RenfeSpamTests(unittest.TestCase):
         self.assertEqual(len(messages),1)
         self.assertEqual(messages[0].count("C-1"),2)
 
+    def test_radar_fluctuations_never_trigger_extra_telegram(self):
+        alerts=merge_trips([sample("cadiz-jerez")],NOW)
+        alert=alerts[0]
+        notices=[]
+        with tempfile.TemporaryDirectory() as td:
+            with patch.object(updates,"STATE_FILE",Path(td)/"sent.json"):
+                updates.notify_events([alert],lambda x:notices.append(x) or True,NOW)
+                changed=dict(alert,crosscheck=[{
+                    "city":"jerez","event":"arrivals",
+                    "gtfs_time":"15:29","radar_time":"15:20",
+                    "difference_minutes":9,
+                }])
+                updates.notify_events([changed],
+                    lambda x:notices.append(x) or True,NOW)
+        self.assertEqual(len(notices),1)
+
     def test_failed_send_does_not_mark_as_sent(self):
         messages=[]
         with tempfile.TemporaryDirectory() as td:
