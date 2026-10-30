@@ -3,6 +3,9 @@ import copy
 import unittest
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from unittest.mock import patch
+import tempfile
+import transport_updates as updates
 
 import radar_shadow as radar
 
@@ -143,6 +146,30 @@ class RadarShadowTests(unittest.TestCase):
         self.assertEqual(result["requested"],0)
         self.assertEqual(result["status"],"no_today_md_trips")
         self.assertEqual(h.requests,[])
+
+    def test_integrated_live_refresh_reports_observer_without_publishing_it(self):
+        with tempfile.TemporaryDirectory() as folder:
+            report_path=__import__("pathlib").Path(folder)/"report.json"
+            rows={"cadiz-puerto":[trip()]}
+            original=copy.deepcopy(rows)
+            summary={"mode":"shadow_only","status":"available",
+                     "independent_adif":False,"matched":1,"conflicts":0}
+            with patch.object(updates,"REPORT_FILE",report_path), \
+                 patch("transport_updates.rail_changes",return_value=([],[])), \
+                 patch("transport_updates.bus_notices",return_value=([],[])), \
+                 patch("maritime_status.live_maritime_changes",return_value=([],[])), \
+                 patch("source_alerts.apply_source_alerts",return_value=([],[])), \
+                 patch("transport_updates.notify_events") as notify, \
+                 patch("radar_shadow.compare_station_boards",return_value=summary) as observe:
+                meta=updates.apply_changes(rows,lambda message:True,now=NOW)
+                observe.assert_called_once()
+                self.assertEqual(rows,original)
+                self.assertEqual(meta["changes"],0)
+                notify.assert_called_once()
+                self.assertEqual(notify.call_args.args[0],[])
+                saved=__import__("json").loads(report_path.read_text())
+                self.assertEqual(saved["sources"]["RADAR"],summary)
+                self.assertNotIn("RADAR",meta)
 
     def test_midnight_and_local_date(self):
         self.assertEqual(radar._clock(epoch(17,10)),(DAY,"17:10"))
