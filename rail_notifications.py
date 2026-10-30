@@ -15,7 +15,7 @@ REPEAT_WORSENING_MIN = 10
 REPEAT_EARLIER_DEPARTURE_MIN = 5
 NAMES = {"cadiz": "Cádiz", "puerto": "El Puerto", "jerez": "Jerez"}
 METRICS = ("dep_late", "dep_early", "arr_late", "arr_early", "uncertain")
-ORDER = {"cancelled": 3, "skipped": 3, "timing": 2, "uncertain": 1}
+ORDER = {"cancelled": 4, "skipped": 3, "timing": 2, "uncertain": 1}
 
 
 def meaningful_departure(delta):
@@ -107,6 +107,7 @@ def merge_trips(events, now):
                 for item in group["checks"]]
             group["detail"] = "Renfe · " + "; ".join(notes)
         group.pop("segments", None)
+        group.pop("latest_end", None)
         result.append(group)
     return sorted(result, key=lambda e: (
         -ORDER[e["kind"]], e["departure"], e["id"]))
