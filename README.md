@@ -729,3 +729,43 @@ script verifies VPS host/clean main, runs offline tests, fast-forwards
 source without discarding local changes, restores the existing 15-minute
 systemd timer and starts one refresh. No Nginx/AVÍO/rebuild/periodic Git
 commits or changes to user-facing messages.
+
+## Source comparison in existing Telegram MD alerts (30 Oct 2026)
+
+If a **significant Renfe GTFS Realtime MD update** is already eligible for
+Telegram (departure more than 5 minutes late, any earlier departure,
+arrival more than 5 minutes early/late or an incoherent prediction), the
+existing RadarDeTrenes station-board shadow comparison can add a short
+source summary *inside that same message* when the two channels materially
+disagree. No new stand-alone notifications, extra polling, extra re-alerts
+or changes to browser timetables are introduced.
+
+To avoid false disagreements, the message only includes comparisons
+where all of the following are true:
+
+- Exact same five-digit MD train number, GTFS service date, station
+  code, scheduled minute and arrival/departure type (no nearest-train match).
+- Both board and individual row are fresh (not older than ten minutes).
+- Board value is explicitly `ESTIMATED` or `ACTUAL`; `SCHEDULED`
+  is **not evidence** that a train is on time. Invalid, missing and
+  logically impossible GTFS times are not compared as actual times.
+- The two reported endpoint times differ by **more than five minutes**.
+  At most two disagreements per train are shown, with real station
+  links to RadarDeTrenes and a prominent caveat that both paths
+  ultimately use Renfe data. This is **not an independent ADIF check**.
+
+Example:
+`Datos distintos · llegada El Puerto: GTFS Renfe 17:50,
+RadarDeTrenes (tablero Renfe) 17:38`
+plus a clickable `https://radardetrenes.com/estacion/el-puerto-de-santamaria`
+and the qualifier `No es confirmación independiente de ADIF.`
+
+The comparison currently covers **Media Distancia only**; the per-train
+cross-check remains read-only and may be unavailable if no matching
+realtime estimate appears on the board. Source faults must not prevent
+the normal site publication or suppress existing Renfe alerts. There are
+no misleading "Renfe on time" assertions just because a second
+board shows the published schedule.
+
+Deploy with the already guarded `deploy/publish-radar-shadow.sh` after
+the CI run succeeds. No HTML or service definitions are changed.
