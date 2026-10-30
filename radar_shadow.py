@@ -35,8 +35,8 @@ def _train_code(trip_id, service_date):
 
 
 def _minutes(a, b):
-    diff = (int(b[:2]) * 60 + int(b[3:]) -
-            (int(a[:2]) * 60 + int(a[3:])) % 1440
+    diff = ((int(b[:2]) * 60 + int(b[3:])) -
+            (int(a[:2]) * 60 + int(a[3:]))) % 1440
     return diff - 1440 if diff > 720 else diff
 
 
