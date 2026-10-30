@@ -700,13 +700,13 @@ results. API documentation: https://radardetrenes.com/docs
 `radar_shadow.py` polls those three station boards once per live
 15-minute timetable refresh, requests at most three responses, uses a
 6-second per-source timeout and fails open for the existing site.
-It only compares **today's Media Distancia** trains with a strict composite
+It only compares **today's C-1 and Media Distancia** trains with a strict composite
 key of station code + exact five-digit train number parsed from the
-date-scoped Renfe static GTFS ID + scheduled clock time + departure/arrival
+known Renfe static GTFS ID pattern and date-scoped service row + scheduled clock time + departure/arrival
 kind. It checks source provenance and freshness (no older than 10 min)
 and records delay conflicts of at least five minutes.
 
-Diagnostics live **only** in
+Diagnostics live in
 `output/service_change_report.json → sources.RADAR` (status,
 healthy/requested, matched, conflicts, sample train codes and delays).
 A train missing from a board's rolling window is not marked cancelled.
