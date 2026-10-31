@@ -753,7 +753,7 @@ def _filter_short_cmtbc_outages(issues, now):
 
     Pending outages still appear in the local diagnostics and in the
     passenger-facing cached bus/boat warnings. Other source errors
-    are reported immediately. Missed refreshes beyond 40 minutes break
+    are reported immediately. Missed refreshes beyond 25 minutes break
     the sequence; duplicate rows within one refresh never increment it.
     """
     OUTAGE_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -781,11 +781,13 @@ def _filter_short_cmtbc_outages(issues, now):
     pending = []
     for route, issue in sorted(failing.items()):
         old = previous.get(route, {})
+        if not isinstance(old, dict):
+            old = {}
         count = 1
         try:
             last = datetime.fromisoformat(old["last_seen"])
             age = (now - last).total_seconds()
-            if 0 <= age <= 40 * 60:
+            if 0 <= age <= 25 * 60:
                 count = max(0, int(old.get("count", 0))) + 1
         except (TypeError, KeyError, ValueError, OverflowError):
             pass
