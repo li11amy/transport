@@ -32,6 +32,7 @@ class CMTBCAlertTests(unittest.TestCase):
                  patch.object(h, "DATA_OUTPUT", root / "transport_data.json"), \
                  patch.object(h, "WARNINGS_FILE", root / "warnings.json"), \
                  patch.object(h, "ALERT_STATE_FILE", root / "alert.sha256"), \
+                 patch.object(h, "OUTAGE_STATE_FILE", root / "outages.json"), \
                  patch.object(h, "fetch", side_effect=requests.HTTPError("CMTBC 503")), \
                  patch.object(h, "cached_ctan_route", return_value=[
                      cached_bus(i) for i in range(60)]), \
@@ -67,6 +68,7 @@ class CMTBCAlertTests(unittest.TestCase):
             distinct = {"route": "cadiz-puerto", "detail": "Código de días desconocido"}
             with patch.object(h, "WARNINGS_FILE", root / "warnings.json"), \
                  patch.object(h, "ALERT_STATE_FILE", root / "alert.sha256"), \
+                 patch.object(h, "OUTAGE_STATE_FILE", root / "outages.json"), \
                  patch.object(h, "notify_telegram",
                               side_effect=lambda message: messages.append(message) or True):
                 h.report_issues([one] * 50 + [two] * 9 + [distinct])
