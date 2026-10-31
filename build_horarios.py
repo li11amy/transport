@@ -25,6 +25,9 @@ OUTPUT = Path(__file__).parent / "output" / "horarios_tres_ciudades.html"
 DATA_OUTPUT = OUTPUT.parent / "transport_data.json"
 WARNINGS_FILE = OUTPUT.parent / "transport_warning_report.json"
 ALERT_STATE_FILE = OUTPUT.parent / "transport_last_alert.sha256"
+# This is shown on each cached bus/boat row, not one Telegram issue per row.
+CMTBC_STALE_NOTICE = ("Consorcio sin respuesta: horario de autobús/barco "
+                      "no verificado en esta actualización")
 # Source calendar codes. Unknown codes remain visible in red and trigger a report.
 ALLOWED_DAYS = {"L-J", "L-V", "L-S", "L-D", "S", "D", "S-D-F", "V"}
 
@@ -63,6 +66,14 @@ def fetch(url):
                 time.sleep(2)
                 continue
             raise
+        except requests.HTTPError as exc:
+            # The origin occasionally returns temporary gateway/rate-limit
+            # errors. A single retry avoids an unnecessary outage alert.
+            code = exc.response.status_code if exc.response is not None else None
+            if attempt == 0 and code in (429, 500, 502, 503, 504):
+                time.sleep(2)
+                continue
+            raise
 
 
 def cached_ctan_route(route):
@@ -71,8 +82,7 @@ def cached_ctan_route(route):
     A lost CMTBC response must never block a valid Renfe refresh or display
     last known bus times as confirmed. Do not cache train times here.
     """
-    warning = ("Consorcio sin respuesta: horario de autobús/barco "
-               "no verificado en esta actualización")
+    warning = CMTBC_STALE_NOTICE
     for path in (DATA_OUTPUT, Path("/srv/www/transport/transport_data.json")):
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -738,22 +748,34 @@ def notify_telegram(message):
 
 
 def report_issues(issues):
-    """Store full diagnostics. Notify once for each newly observed set of issues."""
+    """One Telegram notice per distinct route/diagnostic, never per cached row.
+
+    The source parser may emit the same warning for dozens of trains.
+    Keep unique details in the local report and use a stable signature
+    independent of row order. A recovered source resets alert state.
+    """
+    unique = {(issue["route"], issue["detail"])
+              for issue in issues}
+    compact = [{"route": route, "detail": detail}
+               for route, detail in sorted(unique)]
     WARNINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    report = {"checked_at": datetime.now().isoformat(timespec="seconds"), "issues": issues}
+    report = {
+        "checked_at": datetime.now().isoformat(timespec="seconds"),
+        "issues": compact, "duplicates_suppressed": len(issues) - len(compact),
+    }
     WARNINGS_FILE.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-    if not issues:
+    if not compact:
         ALERT_STATE_FILE.unlink(missing_ok=True)
         return
     signature = hashlib.sha256(
-        json.dumps(issues, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+        json.dumps(compact, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
     if ALERT_STATE_FILE.exists() and ALERT_STATE_FILE.read_text().strip() == signature:
         print("Previously reported transport warning; no duplicate Telegram alert", flush=True)
         return
     message = "⚠️ Transport: требуется проверка расписания.\n" + "\n".join(
-        issue["route"] + ": " + issue["detail"] for issue in issues[:15])
-    if len(issues) > 15:
-        message += "\n… и ещё {} предупреждений".format(len(issues) - 15)
+        issue["route"] + ": " + issue["detail"] for issue in compact[:15])
+    if len(compact) > 15:
+        message += "\n… и ещё {} предупреждений".format(len(compact) - 15)
     try:
         if notify_telegram(message):
             ALERT_STATE_FILE.write_text(signature, encoding="utf-8")
@@ -783,7 +805,10 @@ def build(data_only=False):
                 print("STALE CMTBC {}: {}".format(key, exc), flush=True)
             data[key] = trips
             for trip in trips:
-                if trip["aviso"]:
+                # Cache fallback already generated one source-failure issue
+                # for this route. Keep row-level warning visible on the site,
+                # but never list it once per bus in Telegram.
+                if trip["aviso"] and trip["aviso"] != CMTBC_STALE_NOTICE:
                     issues.append({"route": key, "detail": trip["aviso"]})
     except Exception as exc:
         report_issues([{"route": "ERROR", "detail": str(exc)}])
