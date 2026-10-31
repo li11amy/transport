@@ -801,3 +801,35 @@ never imply cancellations and do not block the Renfe train schedule.
 Use the safe transport source-deploy script
 `deploy/publish-radar-shadow.sh` to install after CI passes; it does not
 regenerate the static HTML or reset Telegram state.
+
+## Midnight CMTBC HTTP 500 and two-check alert rule (31 Oct 2026)
+
+**Verified from VPS systemd logs:** `2026-10-31 00:00:13 Europe/Madrid`
+`cadiz-puerto` received `500 Internal Server Error` from
+`https://siu.cmtbc.es/es/horarios_origen_destino.php?ida=1&vuelta=8`.
+The `00:15:47`, `00:30` and `00:45` local refreshes completed
+without a CMTBC source error. It may be a midnight service/calendar
+rollover, **but maintenance is not confirmed**.
+
+The existing bus/boat cache fallback continues marking each affected row
+`Consorcio sin respuesta: horario de autobús/barco no verificado...` on
+the website **immediately**. Unverified times are never shown as fresh.
+The Telegram source warning is now delayed until **two successive failed
+15-minute updates for the same direction** (maximum gap 25 minutes).
+One failure is recorded only in
+`output/transport_warning_report.json` with
+`pending_outages`, while the persistent per-route counter lives in
+`output/transport_cmtbc_outage_state.json`. The first two failures
+produce exactly **one** message, and later identical failures are
+deduplicated even if the HTTP error type changes. Complete recovery
+resets the counter and the notification signature; it is logged to
+the service journal, not announced as another Telegram message.
+A fatal incomplete update does not count as recovery.
+Other unusual-day codes, Renfe source problems and fatal errors are
+still notified immediately. Source-state files are never overwritten
+during deployment.
+
+No scheduler/time changes, no extra source requests and no separate
+nightly monitoring process are introduced. Source changes may be
+deployed through the existing guarded `deploy/publish-radar-shadow.sh`
+after CI succeeds. Do not restart AVÍO or change any unrelated service.

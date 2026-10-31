@@ -9,7 +9,7 @@ import re
 import hashlib
 import argparse
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
@@ -25,6 +25,7 @@ OUTPUT = Path(__file__).parent / "output" / "horarios_tres_ciudades.html"
 DATA_OUTPUT = OUTPUT.parent / "transport_data.json"
 WARNINGS_FILE = OUTPUT.parent / "transport_warning_report.json"
 ALERT_STATE_FILE = OUTPUT.parent / "transport_last_alert.sha256"
+OUTAGE_STATE_FILE = OUTPUT.parent / "transport_cmtbc_outage_state.json"
 # This is shown on each cached bus/boat row, not one Telegram issue per row.
 CMTBC_STALE_NOTICE = ("Consorcio sin respuesta: horario de autobús/barco "
                       "no verificado en esta actualización")
@@ -747,35 +748,102 @@ def notify_telegram(message):
     return True
 
 
-def report_issues(issues):
-    """One Telegram notice per distinct route/diagnostic, never per cached row.
+def _filter_short_cmtbc_outages(issues, now):
+    """Alert only after two consecutive refreshes fail for the same route.
 
-    The source parser may emit the same warning for dozens of trains.
-    Keep unique details in the local report and use a stable signature
-    independent of row order. A recovered source resets alert state.
+    Pending outages still appear in the local diagnostics and in the
+    passenger-facing cached bus/boat warnings. Other source errors
+    are reported immediately. Missed refreshes beyond 25 minutes break
+    the sequence; duplicate rows within one refresh never increment it.
     """
-    unique = {(issue["route"], issue["detail"])
-              for issue in issues}
+    OUTAGE_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        raw = json.loads(OUTAGE_STATE_FILE.read_text(encoding="utf-8"))
+        previous = raw if isinstance(raw, dict) else {}
+    except (OSError, ValueError):
+        previous = {}
+
+    failing = {}
+    immediate = []
+    for issue in issues:
+        if (issue["route"] != "ERROR" and
+                issue["detail"].startswith("CMTBC sin respuesta; autobuses/barcos")):
+            failing[issue["route"]] = issue
+        else:
+            immediate.append(issue)
+
+    # A fatal, incomplete refresh cannot establish that routes recovered.
+    if any(item["route"] == "ERROR" for item in issues):
+        return issues, [], []
+
+    current = {}
+    confirmed = []
+    pending = []
+    for route, issue in sorted(failing.items()):
+        old = previous.get(route, {})
+        if not isinstance(old, dict):
+            old = {}
+        count = 1
+        try:
+            last = datetime.fromisoformat(old["last_seen"])
+            age = (now - last).total_seconds()
+            if 0 <= age <= 25 * 60:
+                count = max(0, int(old.get("count", 0))) + 1
+        except (TypeError, KeyError, ValueError, OverflowError):
+            pass
+        current[route] = {"count": count, "last_seen": now.isoformat()}
+        if count >= 2:
+            # Stable text across HTTP 500/503/429: a changed HTTP code
+            # does not create another Telegram alert during one outage.
+            confirmed.append({
+                "route": route,
+                "detail": "CMTBC sin respuesta en dos comprobaciones consecutivas; "
+                          "horario de autobús/barco no verificado",
+            })
+        else:
+            pending.append({"route": route, "count": count})
+
+    recovered = sorted(set(previous) - set(current))
+    for route in recovered:
+        print("CMTBC source recovered: " + route, flush=True)
+    temp = OUTAGE_STATE_FILE.with_suffix(".json.tmp")
+    temp.write_text(json.dumps(current, ensure_ascii=False), encoding="utf-8")
+    os.replace(temp, OUTAGE_STATE_FILE)
+    return immediate + confirmed, pending, recovered
+
+
+def report_issues(issues, now=None):
+    """Persist every unique source issue, but defer transient CMTBC alerts."""
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        raise ValueError("Source-warning timestamp must be timezone-aware")
+    unique = {(issue["route"], issue["detail"]) for issue in issues}
     compact = [{"route": route, "detail": detail}
                for route, detail in sorted(unique)]
+    notify_issues, pending, recovered = _filter_short_cmtbc_outages(compact, now)
     WARNINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
     report = {
-        "checked_at": datetime.now().isoformat(timespec="seconds"),
-        "issues": compact, "duplicates_suppressed": len(issues) - len(compact),
+        "checked_at": now.isoformat(timespec="seconds"),
+        "issues": compact,
+        "duplicates_suppressed": len(issues) - len(compact),
+        "pending_outages": pending, "recovered_routes": recovered,
     }
     WARNINGS_FILE.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-    if not compact:
+    if not notify_issues:
+        # A single failed refresh is diagnostic only. Recovery clears the
+        # old notification fingerprint so a later outage can alert again.
         ALERT_STATE_FILE.unlink(missing_ok=True)
         return
+    notify_issues.sort(key=lambda issue: (issue["route"], issue["detail"]))
     signature = hashlib.sha256(
-        json.dumps(compact, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+        json.dumps(notify_issues, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
     if ALERT_STATE_FILE.exists() and ALERT_STATE_FILE.read_text().strip() == signature:
         print("Previously reported transport warning; no duplicate Telegram alert", flush=True)
         return
     message = "⚠️ Transport: требуется проверка расписания.\n" + "\n".join(
-        issue["route"] + ": " + issue["detail"] for issue in compact[:15])
-    if len(compact) > 15:
-        message += "\n… и ещё {} предупреждений".format(len(compact) - 15)
+        issue["route"] + ": " + issue["detail"] for issue in notify_issues[:15])
+    if len(notify_issues) > 15:
+        message += "\n… и ещё {} предупреждений".format(len(notify_issues) - 15)
     try:
         if notify_telegram(message):
             ALERT_STATE_FILE.write_text(signature, encoding="utf-8")
