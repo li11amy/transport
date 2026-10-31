@@ -770,3 +770,34 @@ board shows the published schedule.
 
 Deploy with the already guarded `deploy/publish-radar-shadow.sh` after
 the CI run succeeds. No HTML or service definitions are changed.
+
+## CMTBC outage alerts: one warning per route (31 Oct 2026)
+
+If one CMTBC origin/destination request fails, bus/boat rows are taken
+from the last successfully published dataset, never silently treated as
+fresh. Each cached row keeps the Spanish `Consorcio sin respuesta...`
+annotation for the yellow passenger-facing caution. That is one source
+outage, **not 50 separate bus cancellations**.
+
+The source-warning collector deliberately adds only one
+`CMTBC sin respuesta; autobuses/barcos con datos anteriores` issue
+per failed route. The repeated per-row cache annotation must never
+be added to the Telegram list. Independently meaningful diagnostics
+such as unknown service-day codes are preserved.
+
+`report_issues` deduplicates identical (route, detail) issues in the
+local report and Telegram. Its persisted hash is computed from a
+deterministically sorted set, so reordering rows on the next 15-minute
+refresh does not cause repeat messages. Once all issues clear, the
+alert state is reset so a new outage may be reported. In local diagnostics
+`duplicates_suppressed` counts any repeated raw issues that were removed.
+
+HTTP 429/500/502/503/504 responses get one extra request after a
+two-second pause (like connection/timeouts). 403 remains immediate;
+CMTBC might respond correctly in a browser yet fail from the VPS,
+so the precise HTTP status must come from server logs. Source failures
+never imply cancellations and do not block the Renfe train schedule.
+
+Use the safe transport source-deploy script
+`deploy/publish-radar-shadow.sh` to install after CI passes; it does not
+regenerate the static HTML or reset Telegram state.
