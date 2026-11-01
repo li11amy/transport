@@ -117,6 +117,13 @@ class TelegramTrainTests(unittest.TestCase):
         patched=module.patch(HTML)
         self.assertEqual(module.patch(patched),patched)
         self.assertIn('https://t.me/Alarma_cmtbc_bot?start=', patched)
+        self.assertIn('className="trip-extra-main"', patched)
+        self.assertIn('aria-label","Comprobar tren en Telegram"', patched)
+        self.assertNotIn('↗ Comprobar ahora en Telegram', patched)
+        legacy = patched.replace(module.LINK_REPLACEMENT, module.LEGACY_LINK_REPLACEMENT).replace(
+            module.CSS_REPLACEMENT, module.LEGACY_CSS_REPLACEMENT)
+        self.assertNotEqual(legacy, patched)
+        self.assertEqual(module.patch(legacy), patched)
         self.assertIn('if(marked||trainCheck)',patched)
         self.assertIn('const marked=Boolean(status||t.aviso)',patched)
         self.assertIn('if(cancelled) tr.classList.add("service-cancelled")',patched)

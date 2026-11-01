@@ -297,9 +297,13 @@ tr.trip-expandable:focus-visible{outline:2px solid #1f4fa8;outline-offset:-2px}
 .trip-extra td{padding:10px 12px;background:#fffaf1;color:#5f4d21;text-align:left;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 .trip-extra.cancelled td{background:#fff2f2;color:#8b2323}
 .trip-extra a{display:inline-block;margin-left:8px}
-.trip-extra .trip-check-link{margin:9px 0 0;display:table;border:1px solid #9db8ee;
-  background:#eef4ff;color:#1f4fa8;border-radius:9px;padding:7px 10px;
-  text-decoration:none;font-size:12px;font-weight:600}
+.trip-extra-main{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.trip-extra-main > span{flex:1;min-width:0}
+.trip-extra .trip-check-link{margin:0;display:inline-flex;align-items:center;justify-content:center;
+  flex:none;width:36px;height:36px;padding:0;border-radius:50%;
+  color:#229ed9;text-decoration:none}
+.trip-extra .trip-check-link svg{display:block;width:27px;height:27px;fill:currentColor}
+.trip-extra .trip-check-link:focus-visible{outline:2px solid #1f4fa8;outline-offset:2px}
 
 a{color:#1f4fa8}
 .offline-notice[hidden]{display:none}
@@ -558,16 +562,21 @@ function update() {
       const message=document.createElement("span");
       message.textContent=t.detalle||t.aviso||
         (cancelled?"Servicio cancelado.":"Comprueba este servicio antes de viajar.");
-      details.appendChild(message);
+      const main=document.createElement("div");
+      main.className="trip-extra-main";
+      main.appendChild(message);
       if(trainCheck){
         const link=document.createElement("a");
         link.className="trip-check-link";
         link.href="https://t.me/Alarma_cmtbc_bot?start="+trainCheck;
         link.target="_blank";
         link.rel="noopener noreferrer";
-        link.textContent="↗ Comprobar ahora en Telegram";
-        details.appendChild(link);
+        link.setAttribute("aria-label","Comprobar tren en Telegram");
+        link.title="Comprobar tren en Telegram";
+        link.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 .2C5.5 .2.2 5.5.2 12S5.5 23.8 12 23.8 23.8 18.5 23.8 12 18.5.2 12 .2Zm5.5 7.7-2 9.4c-.15.66-.55.82-1.1.5l-3-2.2-1.45 1.4c-.16.16-.3.3-.6.3l.22-3.05 5.55-5.02c.24-.21-.05-.33-.37-.12l-6.87 4.33-2.96-.92c-.65-.2-.66-.64.13-.95L16.6 7.1c.54-.2 1.01.13.84.8Z"/></svg>';
+        main.appendChild(link);
       }
+      details.appendChild(main);
       if(t.fuente_cambio) {
         const technicalRenfe=t.tipo==="tren" &&
           /^https:\/\/gtfsrt\.renfe\.com\//.test(t.fuente_cambio);
