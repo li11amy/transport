@@ -297,8 +297,10 @@ tr.trip-expandable:focus-visible{outline:2px solid #1f4fa8;outline-offset:-2px}
 .trip-extra td{padding:10px 12px;background:#fffaf1;color:#5f4d21;text-align:left;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 .trip-extra.cancelled td{background:#fff2f2;color:#8b2323}
 .trip-extra a{display:inline-block;margin-left:8px}
-.trip-extra-main{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-.trip-extra-main > span{flex:1;min-width:0}
+.trip-extra-main{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.trip-extra-content{display:flex;flex:1;min-width:0;flex-direction:column;gap:2px}
+.trip-extra-content > span{display:block}
+.trip-extra .trip-source-link{display:block;margin:0;line-height:1.5}
 .trip-extra .trip-check-link{margin:0;display:inline-flex;align-items:center;justify-content:center;
   flex:none;width:36px;height:36px;padding:0;color:#6b7280;text-decoration:none}
 .trip-extra .trip-check-link svg{display:block;width:18px;height:18px;fill:none;
@@ -565,7 +567,10 @@ function update() {
         (cancelled?"Servicio cancelado.":"Comprueba este servicio antes de viajar.");
       const main=document.createElement("div");
       main.className="trip-extra-main";
-      main.appendChild(message);
+      const content=document.createElement("div");
+      content.className="trip-extra-content";
+      content.appendChild(message);
+      main.appendChild(content);
       if(trainCheck){
         const link=document.createElement("a");
         link.className="trip-check-link";
@@ -577,7 +582,6 @@ function update() {
         link.innerHTML='<svg data-icon="message-circle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>';
         main.appendChild(link);
       }
-      details.appendChild(main);
       if(t.fuente_cambio) {
         const technicalRenfe=t.tipo==="tren" &&
           /^https:\/\/gtfsrt\.renfe\.com\//.test(t.fuente_cambio);
@@ -587,7 +591,8 @@ function update() {
           source.target="_blank";
           source.rel="noopener noreferrer";
           source.textContent="Consultar Cercanías en Renfe";
-          details.appendChild(source);
+          source.className="trip-source-link";
+          content.appendChild(source);
         } else if(technicalRenfe){
           // MD realtime JSON is not a passenger page: omit empty attribution.
         } else {
@@ -596,9 +601,11 @@ function update() {
           source.target="_blank";
           source.rel="noopener noreferrer";
           source.textContent="Fuente";
-          details.appendChild(source);
+          source.className="trip-source-link";
+          content.appendChild(source);
         }
       }
+      details.appendChild(main);
       extra.appendChild(details);
       fragment.appendChild(extra);
       tr.classList.add("trip-expandable");
