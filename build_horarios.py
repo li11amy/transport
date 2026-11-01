@@ -300,9 +300,10 @@ tr.trip-expandable:focus-visible{outline:2px solid #1f4fa8;outline-offset:-2px}
 .trip-extra-main{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .trip-extra-main > span{flex:1;min-width:0}
 .trip-extra .trip-check-link{margin:0;display:inline-flex;align-items:center;justify-content:center;
-  flex:none;width:36px;height:36px;padding:0;border-radius:50%;
-  color:#229ed9;text-decoration:none}
-.trip-extra .trip-check-link svg{display:block;width:27px;height:27px;fill:currentColor}
+  flex:none;width:36px;height:36px;padding:0;color:#6b7280;text-decoration:none}
+.trip-extra .trip-check-link svg{display:block;width:18px;height:18px;fill:none;
+  stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.trip-extra .trip-check-link:hover{color:#1f4fa8}
 .trip-extra .trip-check-link:focus-visible{outline:2px solid #1f4fa8;outline-offset:2px}
 
 a{color:#1f4fa8}
@@ -573,7 +574,7 @@ function update() {
         link.rel="noopener noreferrer";
         link.setAttribute("aria-label","Comprobar tren en Telegram");
         link.title="Comprobar tren en Telegram";
-        link.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 .2C5.5 .2.2 5.5.2 12S5.5 23.8 12 23.8 23.8 18.5 23.8 12 18.5.2 12 .2Zm5.5 7.7-2 9.4c-.15.66-.55.82-1.1.5l-3-2.2-1.45 1.4c-.16.16-.3.3-.6.3l.22-3.05 5.55-5.02c.24-.21-.05-.33-.37-.12l-6.87 4.33-2.96-.92c-.65-.2-.66-.64.13-.95L16.6 7.1c.54-.2 1.01.13.84.8Z"/></svg>';
+        link.innerHTML='<svg data-icon="message-circle" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>';
         main.appendChild(link);
       }
       details.appendChild(main);
