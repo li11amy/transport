@@ -297,6 +297,9 @@ tr.trip-expandable:focus-visible{outline:2px solid #1f4fa8;outline-offset:-2px}
 .trip-extra td{padding:10px 12px;background:#fffaf1;color:#5f4d21;text-align:left;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 .trip-extra.cancelled td{background:#fff2f2;color:#8b2323}
 .trip-extra a{display:inline-block;margin-left:8px}
+.trip-extra .trip-check-link{margin:9px 0 0;display:table;border:1px solid #9db8ee;
+  background:#eef4ff;color:#1f4fa8;border-radius:9px;padding:7px 10px;
+  text-decoration:none;font-size:12px;font-weight:600}
 
 a{color:#1f4fa8}
 .offline-notice[hidden]{display:none}
@@ -447,6 +450,19 @@ function tdWithStop(time, stop, city, type, estimated=false) {
   }
   return td;
 }
+function checkableTrain(t, route) {
+  if(t.tipo!=="tren"||!["C-1","MD"].includes(t.linea)||!t.trip_id||
+     t.fecha_servicio!==spanishToday()||day!==todayGroup()) return "";
+  const routeCodes={"puerto-cadiz":"pc","puerto-jerez":"pj",
+    "cadiz-puerto":"cp","cadiz-jerez":"cj",
+    "jerez-puerto":"jp","jerez-cadiz":"jc"};
+  const code=routeCodes[route];
+  const date=t.fecha_servicio.replaceAll("-","");
+  const departure=(t.salida||"").replace(":","");
+  const line=t.linea==="C-1"?"C1":"MD";
+  const token="r_"+date+"_"+code+"_"+line+"_"+t.trip_id+"_"+departure;
+  return code&&/^[A-Za-z0-9_-]{1,64}$/.test(token) ? token : "";
+}
 function update() {
   const key=fromCity+"-"+toCity;
   updateRouteControls();
@@ -505,6 +521,7 @@ function update() {
     const tr=document.createElement("tr");
     const status=currentServiceStatus(t);
     const marked=Boolean(status||t.aviso);
+    const trainCheck=checkableTrain(t, fromCity+"-"+toCity);
     const cancelled=status==="cancelled";
     if(cancelled) tr.classList.add("service-cancelled");
     else if(marked) tr.classList.add("service-warning");
@@ -523,7 +540,7 @@ function update() {
       small.textContent=t.dias||"?";
       line.appendChild(small);
     }
-    if(marked) {
+    if(marked||trainCheck) {
       const info=document.createElement("span");
       info.className="trip-info";
       info.textContent="ⓘ";
@@ -532,7 +549,7 @@ function update() {
     }
     tr.appendChild(line);
     fragment.appendChild(tr);
-    if(marked) {
+    if(marked||trainCheck) {
       const extra=document.createElement("tr");
       extra.className="trip-extra"+(cancelled?" cancelled":"");
       extra.hidden=true;
@@ -542,6 +559,15 @@ function update() {
       message.textContent=t.detalle||t.aviso||
         (cancelled?"Servicio cancelado.":"Comprueba este servicio antes de viajar.");
       details.appendChild(message);
+      if(trainCheck){
+        const link=document.createElement("a");
+        link.className="trip-check-link";
+        link.href="https://t.me/Alarma_cmtbc_bot?start="+trainCheck;
+        link.target="_blank";
+        link.rel="noopener noreferrer";
+        link.textContent="↗ Comprobar ahora en Telegram";
+        details.appendChild(link);
+      }
       if(t.fuente_cambio) {
         const technicalRenfe=t.tipo==="tren" &&
           /^https:\/\/gtfsrt\.renfe\.com\//.test(t.fuente_cambio);
@@ -568,7 +594,7 @@ function update() {
       tr.classList.add("trip-expandable");
       tr.tabIndex=0;
       tr.setAttribute("aria-expanded","false");
-      tr.setAttribute("aria-label",t.linea+": "+(cancelled?"cancelado":"cambios o aviso")+". Ver detalles");
+      tr.setAttribute("aria-label",t.linea+": "+(cancelled?"cancelado":marked?"cambios o aviso":"consultar estado")+". Ver detalles");
       const toggle=()=>{
         extra.hidden=!extra.hidden;
         tr.setAttribute("aria-expanded",String(!extra.hidden));

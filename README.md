@@ -833,3 +833,42 @@ No scheduler/time changes, no extra source requests and no separate
 nightly monitoring process are introduced. Source changes may be
 deployed through the existing guarded `deploy/publish-radar-shadow.sh`
 after CI succeeds. Do not restart AVÍO or change any unrelated service.
+
+## On-demand check of an individual Renfe train via Telegram (1 November 2026)
+
+The production timetable has a **Comprobar ahora en Telegram** link in
+the expanded details of **today's** C-1 / MD trains, including unmarked
+(white) train rows. A link opens the existing transport notifier,
+https://t.me/Alarma_cmtbc_bot, with a Telegram deep-link payload containing
+date, direction, line, exact Renfe GTFS trip ID and planned departure
+(all within Telegram's 64-character limit).
+
+- A new dedicated systemd transport-train-check.service runs
+  telegram_train_check.py via Telegram long polling for private messages
+  and callback buttons. It shares the outgoing notifier's token but
+  never modifies outgoing notifications or state. No public HTTP API
+  or webhook is introduced.
+- First use may require pressing Start in Telegram. Subsequent replies
+  provide a **Comprobar otra vez** button. Rate limiting and a brief
+  cached result bound request volume; no site-wide refresh is run.
+- Every uncached request fetches only the specified Renfe C-1 or MD
+  GTFS Realtime feed. Official static GTFS identity, service date,
+  segment endpoints and planned clocks are matched exactly. A feed
+  older than 10 minutes cannot confirm anything. Only explicit
+  cancellation/skipped stops are red; official changed endpoint
+  times are yellow. Missing data is not evidence of punctuality.
+- Passenger timetable colours, JSON, existing push notifications,
+  bus/boat rows and other services are unchanged by each lookup.
+- Patch the two existing, verified transport HTML shells using
+  deploy/patch-train-telegram.py after testing; it also matches the
+  canonical HTML generator in build_horarios.py. The root PWA must
+  never be replaced by the retired GitHub Pages index.html.
+- Publish via deploy/publish-train-check.sh: verify host and clean main,
+  run tests in a staging worktree, fast-forward source, atomically patch
+  the transport PWA shells, and enable the new private bot service.
+  No AVÍO, Bottle Butler, nginx, or transport-update.timer changes.
+- The private polling cursor lives in the ignored local path
+  output/telegram_train_check_offset.json. Never publish the bot token.
+
+White rows are planned only, not confirmed as punctual. The Telegram
+reply is a snapshot of Renfe at the moment of checking.
