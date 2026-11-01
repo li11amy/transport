@@ -120,17 +120,27 @@ class TelegramTrainTests(unittest.TestCase):
         self.assertIn('className="trip-extra-main"', patched)
         self.assertIn('aria-label","Comprobar tren en Telegram"', patched)
         self.assertIn('data-icon="message-circle"', patched)
+        self.assertIn('className="trip-extra-content"', patched)
+        self.assertIn('className="trip-source-link"', patched)
+        self.assertIn('content.appendChild(source)', patched)
+        self.assertNotIn('details.appendChild(source)', patched)
+        self.assertIn('.trip-extra .trip-source-link{display:block;margin:0', patched)
         self.assertIn('stroke:currentColor', patched)
         self.assertNotIn('#229ed9', patched)
-        circle = patched.replace(module.LINK_REPLACEMENT, module.CIRCLE_LINK_REPLACEMENT).replace(
+        previous = patched.replace(module.COMPACT_DETAILS_TAIL, module.CURRENT_DETAILS_TAIL).replace(
+            module.COMPACT_DETAILS_CSS, module.CURRENT_DETAILS_CSS)
+        self.assertNotEqual(previous, patched)
+        self.assertEqual(module.patch(previous), patched)
+        circle = previous.replace(module.LINK_REPLACEMENT, module.CIRCLE_LINK_REPLACEMENT).replace(
             module.CSS_REPLACEMENT, module.CIRCLE_CSS_REPLACEMENT)
         self.assertNotEqual(circle, patched)
         self.assertEqual(module.patch(circle), patched)
         self.assertNotIn('↗ Comprobar ahora en Telegram', patched)
-        legacy = patched.replace(module.LINK_REPLACEMENT, module.LEGACY_LINK_REPLACEMENT).replace(
+        legacy = previous.replace(module.LINK_REPLACEMENT, module.LEGACY_LINK_REPLACEMENT).replace(
             module.CSS_REPLACEMENT, module.LEGACY_CSS_REPLACEMENT)
         self.assertNotEqual(legacy, patched)
         self.assertEqual(module.patch(legacy), patched)
+        self.assertEqual(patched.count('details.appendChild(main);'), 1)
         self.assertIn('if(marked||trainCheck)',patched)
         self.assertIn('const marked=Boolean(status||t.aviso)',patched)
         self.assertIn('if(cancelled) tr.classList.add("service-cancelled")',patched)
