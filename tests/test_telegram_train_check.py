@@ -119,6 +119,13 @@ class TelegramTrainTests(unittest.TestCase):
         self.assertIn('https://t.me/Alarma_cmtbc_bot?start=', patched)
         self.assertIn('className="trip-extra-main"', patched)
         self.assertIn('aria-label","Comprobar tren en Telegram"', patched)
+        self.assertIn('data-icon="message-circle"', patched)
+        self.assertIn('stroke:currentColor', patched)
+        self.assertNotIn('#229ed9', patched)
+        circle = patched.replace(module.LINK_REPLACEMENT, module.CIRCLE_LINK_REPLACEMENT).replace(
+            module.CSS_REPLACEMENT, module.CIRCLE_CSS_REPLACEMENT)
+        self.assertNotEqual(circle, patched)
+        self.assertEqual(module.patch(circle), patched)
         self.assertNotIn('↗ Comprobar ahora en Telegram', patched)
         legacy = patched.replace(module.LINK_REPLACEMENT, module.LEGACY_LINK_REPLACEMENT).replace(
             module.CSS_REPLACEMENT, module.LEGACY_CSS_REPLACEMENT)

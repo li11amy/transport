@@ -836,9 +836,9 @@ after CI succeeds. Do not restart AVÍO or change any unrelated service.
 
 ## On-demand check of an individual Renfe train via Telegram (1 November 2026)
 
-The production timetable has a **Comprobar ahora en Telegram** link in
-the expanded details of **today's** C-1 / MD trains, including unmarked
-(white) train rows. A link opens the existing transport notifier,
+The production timetable has a small **outline chat icon** at the right
+of the expanded details of **today's** C-1 / MD trains, including unmarked
+(white) train rows. The icon has an accessible label and opens the existing transport notifier,
 https://t.me/Alarma_cmtbc_bot, with a Telegram deep-link payload containing
 date, direction, line, exact Renfe GTFS trip ID and planned departure
 (all within Telegram's 64-character limit).
