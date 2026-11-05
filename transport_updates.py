@@ -352,6 +352,20 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
                        str(event.get("delay", "0")).lstrip("-").isdigit()
                 ]
                 delayed = any(abs(delay) >= 60 for delay in intermediate_delays)
+                delay_by_station = [
+                    (str(x.get("stopId")), int(event["delay"]) // 60)
+                    for x in updates
+                    if first["seq"] <= local_positions.get(
+                        str(x.get("stopId")), -1) <= last["seq"]
+                    for event in (x.get("arrival"), x.get("departure"))
+                    if isinstance(event, dict) and
+                       str(event.get("delay", "0")).lstrip("-").isdigit()
+                    and int(event["delay"]) > 0
+                ]
+                largest_stop = max(delay_by_station, key=lambda item: item[1],
+                                   default=None)
+                stop_names = {"51405": "Cádiz", "51400": "El Puerto",
+                              "51300": "Jerez"}
                 if cancelled:
                     status = "cancelled"
                     detail = "Renfe: servicio cancelado o parada suprimida"
@@ -361,14 +375,45 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
                               "se muestra el horario previsto. "
                               "Comprueba este tren antes de viajar")
                 elif changed_departure or changed_arrival:
-                    status = "confirmed"
+                    # A large arrival delay is a station-specific forecast,
+                    # not evidence that the train leaves our origin on time.
+                    serious_delay = (
+                        (actual_arrival is not None and
+                         _signed_minutes(trip["llegada"], actual_arrival) >= 30)
+                        or (actual_departure is not None and
+                            _signed_minutes(trip["salida"], actual_departure) >= 30))
+                    status = "warning" if serious_delay else "confirmed"
                     detail = _passenger_rail_times(
                         trip["salida"], trip["llegada"],
                         actual_departure if changed_departure else None,
                         actual_arrival if changed_arrival else None)
+                    if serious_delay:
+                        station_names = {"cadiz": "Cádiz", "puerto": "El Puerto",
+                                         "jerez": "Jerez"}
+                        origin_name, destination_name = (
+                            station_names.get(k, k) for k in route.split("-"))
+                        if actual_departure is None:
+                            detail += "; salida de {} sin confirmar".format(origin_name)
+                        if actual_arrival is None:
+                            detail += "; llegada a {} sin confirmar".format(destination_name)
+                        max_lateness = max(
+                            _signed_minutes(trip["llegada"], actual_arrival)
+                            if actual_arrival else 0,
+                            _signed_minutes(trip["salida"], actual_departure)
+                            if actual_departure else 0)
+                        detail += ("; retraso muy importante: no contar con el horario previsto"
+                                   if max_lateness >= 60 else
+                                   "; retraso importante: no contar con el horario previsto")
                 elif delayed and relevant:
                     status = "warning"
-                    detail = "Renfe: retraso comunicado en una parada del trayecto; horario pendiente de confirmar"
+                    if largest_stop:
+                        station = stop_names.get(largest_stop[0], "una parada")
+                        detail = ("Renfe: retraso comunicado en {} (+{} min); "
+                                  "horarios de salida y llegada sin confirmar").format(
+                                      station, largest_stop[1])
+                    else:
+                        detail = ("Renfe: retraso comunicado en el trayecto; "
+                                  "horarios de estaciones sin confirmar")
                 else:
                     continue
 
@@ -427,6 +472,18 @@ def rail_changes(data, now, session=None, statistics=None, index_loader=None):
                             "origin": origin, "destination": destination,
                             "first_seq": first["seq"], "last_seq": last["seq"],
                             "planned_departure": trip["salida"],
+                            "departure_unconfirmed": (
+                                actual_departure is None and
+                                actual_arrival is not None and
+                                _signed_minutes(trip["llegada"], actual_arrival) >= 30),
+                            "arrival_unconfirmed": (
+                                actual_arrival is None and
+                                actual_departure is not None and
+                                _signed_minutes(trip["salida"], actual_departure) >= 30),
+                            "uncertain_station": (
+                                {"name": stop_names.get(largest_stop[0], "una parada"),
+                                 "minutes": largest_stop[1]}
+                                if kind == "uncertain" and largest_stop else None),
                         },
                         "checks": checks,
                         "metrics": {

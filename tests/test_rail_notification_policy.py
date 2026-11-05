@@ -73,6 +73,24 @@ class RenfeSpamTests(unittest.TestCase):
         self.assertEqual(msg.count("C-1"),1)
         self.assertIn("Cádiz → Jerez",msg)
 
+    def test_large_arrival_delay_without_departure_is_clear_in_telegram(self):
+        row=sample("puerto-jerez", arrival_delta=59)
+        row["segment"]["departure_unconfirmed"]=True
+        merged=merge_trips([row],NOW)
+        self.assertIn("Llegada Jerez",merged[0]["detail"])
+        self.assertIn("salida de El Puerto sin confirmar",merged[0]["detail"])
+        self.assertIn("retraso importante",merged[0]["detail"])
+        self.assertNotIn("cancelado",merged[0]["detail"])
+
+    def test_uncertain_delay_names_station_not_entire_route(self):
+        row=sample("puerto-jerez", arrival_delta=0, kind="uncertain")
+        row["checks"]=[]
+        row["segment"]["uncertain_station"]={"name":"El Puerto","minutes":59}
+        merged=merge_trips([row],NOW)
+        self.assertIn("Retraso comunicado en El Puerto (+59 min)",
+                      merged[0]["detail"])
+        self.assertNotIn("retraso general",merged[0]["detail"])
+
     def test_md_incoherent_prediction_is_warning_without_false_time_or_source(self):
         row=sample("cadiz-puerto", arrival_delta=0, kind="inconsistent")
         row["line"]="MD"

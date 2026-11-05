@@ -154,6 +154,61 @@ class ServiceUpdateTests(unittest.TestCase):
                     data["puerto-cadiz"][0]["llegada_actual"],
                     "10:{:02d}".format(30 + minutes))
 
+    def test_large_arrival_delay_does_not_imply_departure_from_origin(self):
+        data = {"puerto-cadiz": [trip()]}
+        live = feed([stop("51405", epoch(10, 30), 59 * 60)])
+        http = FakeHttp({updates.RENFE["C-1"]: live,
+                         updates.RENFE["MD"]: feed([])})
+        events, problems = updates.rail_changes(
+            data, NOW, http, index_loader=fake_index_loader)
+        self.assertFalse(problems)
+        row = data["puerto-cadiz"][0]
+        self.assertEqual(row["estado"], "warning")
+        self.assertEqual(row["llegada_actual"], "11:29")
+        self.assertNotIn("salida_actual", row)
+        self.assertIn("salida de El Puerto sin confirmar", row["detalle"])
+        self.assertIn("Llegada 11:29 (+59 min)", row["detalle"])
+        self.assertEqual(events[0]["segment"]["departure_unconfirmed"], True)
+
+    def test_large_delay_with_verified_departure_does_not_mark_it_unknown(self):
+        data = {"puerto-cadiz": [trip()]}
+        live = feed([
+            stop("51400", epoch(10, 0), 59 * 60, "departure"),
+            stop("51405", epoch(10, 30), 59 * 60),
+        ])
+        http = FakeHttp({updates.RENFE["C-1"]: live,
+                         updates.RENFE["MD"]: feed([])})
+        events, problems = updates.rail_changes(
+            data, NOW, http, index_loader=fake_index_loader)
+        self.assertFalse(problems)
+        self.assertEqual(data["puerto-cadiz"][0]["estado"], "warning")
+        self.assertEqual(data["puerto-cadiz"][0]["salida_actual"], "10:59")
+        self.assertNotIn("sin confirmar", data["puerto-cadiz"][0]["detalle"])
+        self.assertFalse(events[0]["segment"]["departure_unconfirmed"])
+
+    def test_sixty_minute_delay_has_stronger_warning(self):
+        data = {"puerto-cadiz": [trip()]}
+        live = feed([stop("51405", epoch(10, 30), 60 * 60)])
+        http = FakeHttp({updates.RENFE["C-1"]: live,
+                         updates.RENFE["MD"]: feed([])})
+        events, problems = updates.rail_changes(
+            data, NOW, http, index_loader=fake_index_loader)
+        self.assertFalse(problems)
+        self.assertIn("retraso muy importante", data["puerto-cadiz"][0]["detalle"])
+        self.assertEqual(events[0]["kind"], "timing")
+
+    def test_station_specific_intermediate_delay_is_not_general_delay(self):
+        data = {"puerto-cadiz": [trip()]}
+        live = feed([stop("51400", epoch(10, 0), 59 * 60, "arrival")])
+        http = FakeHttp({updates.RENFE["C-1"]: live,
+                         updates.RENFE["MD"]: feed([])})
+        events, problems = updates.rail_changes(
+            data, NOW, http, index_loader=fake_index_loader)
+        self.assertFalse(problems)
+        self.assertIn("retraso comunicado en El Puerto (+59 min)",
+                      data["puerto-cadiz"][0]["detalle"])
+        self.assertEqual(events[0]["kind"], "uncertain")
+
     def test_earlier_departure_one_minute_always_notifies(self):
         data = {"puerto-cadiz": [trip()]}
         earlier = feed([stop("51400", epoch(10, 0), -60, "departure")])

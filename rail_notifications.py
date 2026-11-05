@@ -108,12 +108,43 @@ def merge_trips(events, now):
             group["checks"] = []  # No untrustworthy endpoint times.
             group["detail"] = "Renfe · Horarios incoherentes; comprobar este tren"
         elif group["kind"] == "uncertain" and not group["checks"]:
-            group["detail"] = "Renfe · Retraso en el trayecto (≥10 min); horarios de estaciones por confirmar"
+            stations = [segment.get("uncertain_station") for segment in segments]
+            stations = [station for station in stations if station]
+            if stations:
+                largest = max(stations, key=lambda station: station["minutes"])
+                group["detail"] = (
+                    "Renfe · Retraso comunicado en {} (+{} min); "
+                    "horarios de estaciones por confirmar").format(
+                        largest["name"], largest["minutes"])
+            else:
+                group["detail"] = (
+                    "Renfe · Retraso en el trayecto (≥10 min); "
+                    "horarios de estaciones por confirmar")
         else:
             notes = ["{} {} {} ({:+d} min)".format(
                 item["kind"], NAMES[item["city"]], item["time"], item["delta"])
                 for item in group["checks"]]
             group["detail"] = "Renfe · " + "; ".join(notes)
+            unknown_origins = list(dict.fromkeys(
+                NAMES.get(segment["origin"], segment["origin"])
+                for segment in segments
+                if segment.get("departure_unconfirmed")))
+            if unknown_origins:
+                group["detail"] += "; salida de {} sin confirmar".format(
+                    ", ".join(unknown_origins))
+            unknown_destinations = list(dict.fromkeys(
+                NAMES.get(segment["destination"], segment["destination"])
+                for segment in segments
+                if segment.get("arrival_unconfirmed")))
+            if unknown_destinations:
+                group["detail"] += "; llegada a {} sin confirmar".format(
+                    ", ".join(unknown_destinations))
+            lateness = max(group["metrics"]["arr_late"],
+                           group["metrics"]["dep_late"])
+            if lateness >= 30:
+                label = ("retraso muy importante" if lateness >= 60
+                         else "retraso importante")
+                group["detail"] += "; {}: no contar con el horario previsto".format(label)
         group.pop("segments", None)
         group.pop("latest_end", None)
         result.append(group)

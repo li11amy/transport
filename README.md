@@ -834,6 +834,27 @@ nightly monitoring process are introduced. Source changes may be
 deployed through the existing guarded `deploy/publish-radar-shadow.sh`
 after CI succeeds. Do not restart AVÍO or change any unrelated service.
 
+## Large Renfe delays: station-specific and uncertain departures (5 November 2026)
+
+A Renfe delay is measured against the scheduled time **at the reported station**,
+not as extra journey time on the user's city-pair segment. The system must not
+infer an El Puerto departure from a forecast Jerez arrival, or call an
+individual station delay a delay of the entire Cádiz–Jerez route.
+
+For C-1/MD station-specific arrival/departure predictions delayed 30+ minutes,
+the affected row is yellow with a prominent *retraso importante* warning;
+60+ minutes uses *retraso muy importante*. Any missing segment endpoint is
+explicitly labelled *sin confirmar*. Actual confirmed times remain labelled
+by station; no fabricated segment duration is shown. Telegram merges
+duplicate physical-train notices as before, with the same caution.
+
+If only an intermediate-stop delay is known, show the actual named station
+and the measured delay (+N min), rather than presenting it as a route-wide
+delay. The departure and arrival times remain unconfirmed. Only an explicit
+Renfe cancellation/skipped stop is red, never an inferred cancellation
+from a long delay. Preserve the existing coherence checks for impossible
+time combinations, feed freshness checks and notification deduplication.
+
 ## On-demand check of an individual Renfe train via Telegram (1 November 2026)
 
 The production timetable has a small **outline chat icon** at the right
