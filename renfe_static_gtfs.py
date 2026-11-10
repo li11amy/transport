@@ -118,7 +118,18 @@ def build_index_from_zip(zf):
                 raise ValueError("Renfe calendar_dates columns: {}".format(list(entry)))
             exceptions.setdefault(service, {})[entry["date"]] = entry["exception_type"]
 
-    return {"trips": trips, "calendars": calendars, "exceptions": exceptions}
+    # The AV/LD GTFS archive includes different rail products, not just MD.
+    # Preserve Renfe's own route_short_name to avoid labeling ALVIA as MD.
+    relevant_routes = {value["route"] for value in trips.values()}
+    routes = {}
+    if "routes.txt" in zf.namelist():
+        for entry in each_csv(zf, "routes.txt"):
+            route_id = entry.get("route_id", "")
+            if route_id in relevant_routes:
+                routes[route_id] = entry.get("route_short_name", "").upper()
+
+    return {"trips": trips, "calendars": calendars,
+            "exceptions": exceptions, "routes": routes}
 
 
 def service_active(index, trip_id, day):
@@ -126,10 +137,12 @@ def service_active(index, trip_id, day):
     trip = index.get("trips", {}).get(trip_id)
     if not trip:
         return False
-    # Renfe MD trip IDs embed the actual service date. A previous day's delayed
-    # update must never be applied to today's CTAN timetable.
+    # Renfe MD trip IDs can embed the *start of their validity period*,
+    # not the individual operating date. For example, a 2026-11-09 suffix
+    # may cover 10 November and later dates in the service calendar.
+    # Reject future-dated IDs, then rely on calendar/calendar_dates below.
     date_id = re.search(r"(\d{4}-\d{2}-\d{2})$", trip_id)
-    if date_id and date_id.group(1) != day.isoformat():
+    if date_id and date_id.group(1) > day.isoformat():
         return False
     service = trip["service"]
     date_key = day.strftime("%Y%m%d")
@@ -171,7 +184,11 @@ def load_index(line, now, http=None, cache_dir=None):
             existing = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             pass
-    if existing and existing.get("download_day") == now.date().isoformat():
+    # Re-fetch previous-version MD caches: they lack route product names and
+    # cannot distinguish MD from ALVIA safely. No destructive cache deletion.
+    usable = (existing is not None and
+              (line != "MD" or "routes" in existing.get("index", {})))
+    if usable and existing.get("download_day") == now.date().isoformat():
         return existing["index"], None
 
     try:
@@ -188,7 +205,7 @@ def load_index(line, now, http=None, cache_dir=None):
         return index, None
     except (requests.RequestException, OSError, ValueError, KeyError,
             zipfile.BadZipFile) as exc:
-        if existing:
+        if usable:
             try:
                 cached_date = datetime.strptime(existing["download_day"], "%Y-%m-%d").date()
                 if 0 <= (now.date() - cached_date).days <= 2:

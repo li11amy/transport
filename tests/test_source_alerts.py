@@ -56,6 +56,27 @@ class StrikeTests(unittest.TestCase):
         events, meta=apply_source_alerts(rows(),NOW,[alert])
         self.assertEqual((events,meta),([],[]))
 
+    def test_november_strike_dates_and_no_false_cancellations(self):
+        for d in (10, 11, 12):
+            with self.subTest(d=d):
+                day="2026-11-{:02d}".format(d)
+                now=datetime(2026,11,d,10,20,tzinfo=ZoneInfo("Europe/Madrid"))
+                data={"puerto-jerez": [
+                    {"tipo":"tren","linea":"C-1","fecha_servicio":day,
+                     "aviso":""},
+                    {"tipo":"tren","linea":"MD","fecha_servicio":day,
+                     "aviso":""},
+                    {"tipo":"tren","linea":"MD","fecha_servicio":day,
+                     "estado":"cancelled","detalle":"Cancelado","aviso":""},
+                ]}
+                events,meta=apply_source_alerts(data,now)
+                self.assertEqual(len(events),1)
+                self.assertEqual(meta[0]["affected_rows"],2)
+                self.assertEqual(data["puerto-jerez"][0]["estado"],"warning")
+                self.assertEqual(data["puerto-jerez"][1]["estado"],"warning")
+                self.assertEqual(data["puerto-jerez"][2]["estado"],"cancelled")
+                self.assertIn("huelga",data["puerto-jerez"][0]["aviso"].lower())
+
     def test_metadata_display(self):
         self.assertIn('id="officialAlerts"',HTML)
         self.assertIn("SERVICE_META.official_alerts||[]",HTML)

@@ -289,10 +289,13 @@ class ServiceUpdateTests(unittest.TestCase):
         self.assertFalse(updates._coherent_segment_times(
             "23:58", "00:30", None, "23:50"))
 
-    def test_yesterdays_md_train_is_ignored(self):
+    def test_previous_service_date_md_update_is_ignored(self):
         data = {"puerto-cadiz": [trip("MD")]}
         delayed = feed([stop("51400", epoch(10, 0), 180, "departure")])
         delayed["entity"][0]["tripUpdate"]["trip"]["tripId"] = "1303512026-10-27"
+        # GTFS trip ID suffix is a validity-period start; the realtime feed
+        # startDate is what pins an update to its actual operating day.
+        delayed["entity"][0]["tripUpdate"]["trip"]["startDate"] = "20261027"
         index = static_index("1303512026-10-27")
         http = FakeHttp({updates.RENFE["C-1"]: feed([]),
                          updates.RENFE["MD"]: delayed})

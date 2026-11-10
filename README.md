@@ -855,6 +855,39 @@ Renfe cancellation/skipped stop is red, never an inferred cancellation
 from a long delay. Preserve the existing coherence checks for impossible
 time combinations, feed freshness checks and notification deduplication.
 
+## Media Distancia calendar-period fix & November strike (10 November 2026)
+
+Renfe MD static GTFS trip IDs can end in the **calendar period start date**
+(e.g. `1300112026-11-09`) and operate on 10 November and beyond. They are
+not necessarily one-day trip IDs. `service_active()` must validate the
+service's GTFS calendar + calendar_dates and reject a future start, **not**
+require the suffix to equal today's date. Realtime `startDate` is the
+operating date and protects against a stale previous-day update.
+
+Before this fix, the importer incorrectly yielded zero MD rows for all four
+day groups after 9 November and fell back to the old CMTBC MD times with the
+warning `no active trips for any of the four day groups`. Train rows sourced
+from the new official GTFS are **scheduled**, not guaranteed to run during
+industrial action. The official GTFS `Fichero_AV_LD` archive contains both
+`MD` and `ALVIA` route products, so the cached index retains
+`routes.txt:route_short_name` and only `MD` is published as MD. A cache
+lacking route names must be refreshed, not blindly reused. Duplicate active
+GTFS aliases for the same MD route, scheduled departure and arrival are
+collapsed to one canonical train row; the lowest trip ID corresponds to the
+`130xx` identities seen in the Renfe realtime feed on 10 November.
+The RadarDeTrenes observer also accepts a period-start MD trip suffix older
+than the service date, but only on date-valid published rows with exact
+station, train number and scheduled clock.
+
+Source-verified Renfe warnings now cover 10 November (SEMAF), 11 November
+(general strike) and 12 November (SEMAF), with official Renfe press releases.
+For today, `source_alerts.apply_source_alerts` paints affected planned C-1
+and MD rows yellow and includes a global warning with the applicable minimum
+services. It never converts strike impact into individual confirmed
+cancellations. A train on a future-day tab receives no warning for today's
+strike; warning expires after its listed date. Exact GTFS-RT cancellations
+still have precedence.
+
 ## On-demand check of an individual Renfe train via Telegram (1 November 2026)
 
 The production timetable has a small **outline chat icon** at the right

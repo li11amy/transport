@@ -36,6 +36,10 @@ def build_train_rows(index, code, day, group):
     for trip_id, static in index["trips"].items():
         if not service_active(index, trip_id, day):
             continue
+        if code == "MD":
+            # This GTFS file is AV/LD/MD combined. Do not show ALVIA as MD.
+            if index.get("routes", {}).get(static["route"]) != "MD":
+                continue
         stops = sorted(
             [s for s in static["stops"] if s["stop_id"] in by_id],
             key=lambda s: s["seq"])
@@ -66,6 +70,18 @@ def build_train_rows(index, code, day, group):
                     "trip_id": trip_id,
                     "fuente_horario": SOURCES[code],
                 }))
+    if code == "MD":
+        # Renfe may publish multiple GTFS IDs for the same physical departure
+        # (e.g. 130011 / 350011 / 350012 with identical route and times).
+        # The canonical 130xx identifier is also used in its realtime feed.
+        # Keep one row per exact station pair + scheduled clocks, not multiple.
+        unique = {}
+        for route, row in result:
+            key = (route, row["salida"], row["llegada"])
+            current = unique.get(key)
+            if current is None or row["trip_id"] < current[1]["trip_id"]:
+                unique[key] = (route, row)
+        return list(unique.values())
     return result
 
 

@@ -32,17 +32,20 @@ def _clock(epoch_ms):
 def _train_code(trip_id, service_date, line="MD"):
     """Only known exact Renfe GTFS ID patterns, never nearest train.
 
-    MD: 1303122026-10-30  -> 13031 (one variant digit and exact date).
+    MD: 1303122026-10-29  -> 13031 (one variant digit and
+    GTFS calendar-period start, on or before the service date).
     C-1: 3102V23200C1    -> 23200 (four digits + day-code prefix).
     C-1 service dates are checked on the surrounding GTFS row.
     """
     if line == "MD":
-        match = re.fullmatch(r"(\d{5})\d" + re.escape(service_date), str(trip_id))
-    elif line == "C-1":
+        match = re.fullmatch(r"(\d{5})\d(\d{4}-\d{2}-\d{2})", str(trip_id))
+        # The surrounding published row already carries the exact verified
+        # service_date. The suffix identifies the GTFS validity period start.
+        return match.group(1) if match and match.group(2) <= service_date else None
+    if line == "C-1":
         match = re.fullmatch(r"\d{4}[A-Z](\d{5})C1", str(trip_id))
-    else:
-        return None
-    return match.group(1) if match else None
+        return match.group(1) if match else None
+    return None
 
 
 def _minutes(a, b):

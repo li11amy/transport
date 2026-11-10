@@ -35,6 +35,10 @@ def static_zip():
             "service_id,date,exception_type\n"
             "WK,20261029,2\n"
             "WK,20261031,1\n"),
+        "routes.txt": (
+            "route_id,route_short_name,route_type\n"
+            "RMD,MD,2\n"
+            "31T0002C1,C-1,2\n"),
     }
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -52,6 +56,7 @@ class StaticGTFS(unittest.TestCase):
         self.assertEqual([x["stop_id"] for x in index["trips"]["C1A"]["stops"]],
                          ["51300", "51400", "51405"])
         self.assertEqual(index["trips"]["C1A"]["stops"][1]["departure"], "22:58:00")
+        self.assertEqual(index["routes"]["RMD"], "MD")
         self.assertTrue(gtfs.service_active(index, "C1A", date(2026, 10, 28)))
         self.assertFalse(gtfs.service_active(index, "C1A", date(2026, 10, 29)))
         self.assertTrue(gtfs.service_active(index, "C1A", date(2026, 10, 31)))
@@ -77,11 +82,16 @@ class StaticGTFS(unittest.TestCase):
         self.assertEqual([x["stop_id"] for x in stops],
                          ["51300", "51400", "51405"])
 
-    def test_date_embedded_in_md_trip_id(self):
+    def test_md_suffix_is_period_start_not_required_service_day(self):
         with zipfile.ZipFile(static_zip()) as zf:
             index = gtfs.build_index_from_zip(zf)
         index["trips"]["1303512026-10-27"] = index["trips"]["MDOLD"]
-        self.assertFalse(gtfs.service_active(index, "1303512026-10-27", date(2026, 10, 28)))
+        self.assertTrue(gtfs.service_active(index, "1303512026-10-27", date(2026, 10, 28)))
+        # Calendar exceptions still apply: an explicitly removed train stays off.
+        self.assertFalse(gtfs.service_active(index, "1303512026-10-27", date(2026, 10, 29)))
+        self.assertFalse(gtfs.service_active(index, "1303512026-10-27", date(2027, 1, 1)))
+        index["trips"]["1303512026-11-01"] = index["trips"]["MDOLD"]
+        self.assertFalse(gtfs.service_active(index, "1303512026-11-01", date(2026, 10, 28)))
 
     def test_index_is_cached_and_reused(self):
         with tempfile.TemporaryDirectory() as tempdir:

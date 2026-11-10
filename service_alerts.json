@@ -5,11 +5,56 @@
       "id": "renfe-semaf-2026-10-29",
       "date": "2026-10-29",
       "type": "rail_strike",
-      "lines": ["C-1", "MD"],
+      "lines": [
+        "C-1",
+        "MD"
+      ],
       "title": "Huelga de maquinistas de Renfe el 29/10",
       "description": "Circulación afectada por la huelga de maquinistas (SEMAF). Cercanías: servicios mínimos del 75% en hora punta y 50% el resto; Media Distancia: 65% de media. La presencia de un tren en este horario no garantiza su circulación. Comprueba el servicio antes de viajar.",
       "source": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/10/establecidos-servicios-minimos-huelga-semaf-29-octubre",
       "source_published": "2026-10-26",
+      "verified": true
+    },
+    {
+      "id": "renfe-strike-2026-11-10",
+      "date": "2026-11-10",
+      "type": "rail_strike",
+      "lines": [
+        "C-1",
+        "MD"
+      ],
+      "title": "Huelga de maquinistas Renfe · 10/11",
+      "description": "Huelga de maquinistas SEMAF hoy. Cercanías: servicios mínimos del 75% en horas punta y 50% fuera de ellas; Media Distancia: 65% de media. Los horarios mostrados son previstos: un tren listado no está confirmado como operativo. Consulta Renfe antes de viajar.",
+      "source": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/11/establecidos-los-servicios-minimos-para-la-huelga-convocada-por-semaf",
+      "source_published": "2026-11-09",
+      "verified": true
+    },
+    {
+      "id": "renfe-strike-2026-11-11",
+      "date": "2026-11-11",
+      "type": "rail_strike",
+      "lines": [
+        "C-1",
+        "MD"
+      ],
+      "title": "Huelga general · Renfe · 11/11",
+      "description": "Huelga general hoy. Cercanías: servicios mínimos del 75% en horas punta y 50% fuera de ellas; Media Distancia: 65% de media. Los horarios mostrados son previstos: un tren listado no está confirmado como operativo. Consulta Renfe antes de viajar.",
+      "source": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/11/establecidos-los-servicios-minimos-para-la-huelga-general-convocada-el-11n",
+      "source_published": "2026-11-09",
+      "verified": true
+    },
+    {
+      "id": "renfe-strike-2026-11-12",
+      "date": "2026-11-12",
+      "type": "rail_strike",
+      "lines": [
+        "C-1",
+        "MD"
+      ],
+      "title": "Huelga de maquinistas Renfe · 12/11",
+      "description": "Huelga parcial de maquinistas SEMAF hoy. Cercanías: servicios mínimos del 75% en horas punta y 50% fuera de ellas; Media Distancia: 65% de media. Los horarios mostrados son previstos: un tren listado no está confirmado como operativo. Consulta Renfe antes de viajar.",
+      "source": "https://grupo.renfe.com/es/es/sala-de-prensa/noticias/2026/11/establecidos-los-servicios-minimos-para-la-huelga-convocada-por-semaf",
+      "source_published": "2026-11-09",
       "verified": true
     }
   ]

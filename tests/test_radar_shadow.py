@@ -114,7 +114,8 @@ class RadarShadowTests(unittest.TestCase):
     def test_exact_identifiers_prevent_false_matches(self):
         key=radar._train_code("1303122026-10-30",DAY)
         self.assertEqual(key,"13031")
-        self.assertIsNone(radar._train_code("1303122026-10-29",DAY))
+        self.assertEqual(radar._train_code("1303122026-10-29",DAY),"13031")
+        self.assertIsNone(radar._train_code("1303122026-10-31",DAY))
         self.assertIsNone(radar._train_code("RENFE_TEST",DAY))
         self.assertIsNone(radar._train_code("1303102026-10-30wrong",DAY))
         self.assertEqual(radar._train_code("3102V23200C1",DAY,"C-1"),"23200")
