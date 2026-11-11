@@ -165,7 +165,11 @@ def parse(page, origin, destination):
                 origin, destination, cells[:3]))
         if not line or line in ("--", "Líneas"):
             continue
-        kind = "tren" if line in ("C-1", "MD") else "catamaran" if line == "B-042" else "bus"
+        # Renfe C-1a is a university branch of Cercanías, not a bus.
+        # Consorcio writes it as "C-1 a"; it can differ slightly from Renfe
+        # GTFS C-1 times and needs a separate, cautious display.
+        c1a = line.replace(" ", "") == "C-1a"
+        kind = "tren" if line in ("C-1", "MD") or c1a else "catamaran" if line == "B-042" else "bus"
         stop_times = cells[1 : 1 + first_n + second_n]
         departing = pick_stop(stop_titles[:first_n], stop_times[:first_n], origin, kind)
         arriving = pick_stop(stop_titles[first_n:], stop_times[first_n:], destination, kind)
@@ -199,6 +203,14 @@ def parse(page, origin, destination):
         warning = ""
         if days not in ALLOWED_DAYS:
             warning = "Código de días desconocido: {} (línea {})".format(days or "[vacío]", line)
+        if c1a:
+            # No exact-date Renfe GTFS ID is attached to the CMTBC row.
+            # Do not present this academic-day service as verified or
+            # automatically confirm an individual train during a strike.
+            caution = ("C-1a: tren Renfe universitario. Horario del Consorcio "
+                       "sin confirmar en GTFS Renfe; solo circula en días "
+                       "lectivos universitarios. Comprueba antes de viajar.")
+            warning = (warning + " · " if warning else "") + caution
         trips.append({
             "linea": line,
             "tipo": kind,
@@ -474,7 +486,16 @@ function update() {
   const key=fromCity+"-"+toCity;
   updateRouteControls();
   const routeTrips=DATA[key]||[];
-  const trips=routeTrips.filter(t=>types.has(t.tipo)&&operates(t.dias));
+  const selected=routeTrips.filter(t=>types.has(t.tipo)&&operates(t.dias));
+  // C-1a is a genuine Cercanías service, not a bus. Some academic branch
+  // departures also appear under C-1 in official GTFS, with up to a couple
+  // of minutes' difference in the old Consorcio clock. Prefer the dated
+  // Renfe row; keep unmatched C-1a as an explicitly unverified train.
+  const officialC1=selected.filter(t=>t.tipo==="tren"&&t.linea==="C-1"&&t.trip_id);
+  const minute=v=>Number(v.slice(0,2))*60+Number(v.slice(3,5));
+  const closeClock=(a,b)=>Math.abs(minute(a)-minute(b))<=2;
+  const trips=selected.filter(t=>t.linea!=="C-1 a"&&t.linea!=="C-1a"||
+    !officialC1.some(o=>closeClock(o.salida,t.salida)&&closeClock(o.llegada,t.llegada)));
   trips.sort((a,b)=>{
     const at=currentServiceStatus(a)==="confirmed"?(a.salida_actual||a.salida):a.salida;
     const bt=currentServiceStatus(b)==="confirmed"?(b.salida_actual||b.salida):b.salida;
@@ -491,7 +512,7 @@ function update() {
     : "";
   const alertBox=document.getElementById("officialAlerts");
   alertBox.replaceChildren();
-  const activeAlerts=day===todayGroup()
+  const activeAlerts=types.has("tren")&&day===todayGroup()
     ? (SERVICE_META.official_alerts||[]).filter(a=>a.date===spanishToday())
     : [];
   alertBox.hidden=activeAlerts.length===0;
@@ -920,6 +941,10 @@ def build(data_only=False):
                 # for this route. Keep row-level warning visible on the site,
                 # but never list it once per bus in Telegram.
                 if trip["aviso"] and trip["aviso"] != CMTBC_STALE_NOTICE:
+                    # C-1a's permanent source caveat is a passenger label,
+                    # not a new incident to notify repeatedly via Telegram.
+                    if trip["linea"] in ("C-1 a", "C-1a") and "Código de días desconocido" not in trip["aviso"]:
+                        continue
                     issues.append({"route": key, "detail": trip["aviso"]})
     except Exception as exc:
         report_issues([{"route": "ERROR", "detail": str(exc)}])

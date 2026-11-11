@@ -834,6 +834,38 @@ nightly monitoring process are introduced. Source changes may be
 deployed through the existing guarded `deploy/publish-radar-shadow.sh`
 after CI succeeds. Do not restart AVÍO or change any unrelated service.
 
+## C-1a classification and duplicate weekday trains (11 November 2026)
+
+Consorcio publishes `C-1 a` as the Renfe C-1a university branch between
+Las Aletas / Universidad, El Puerto and Jerez. It is **rail, not bus**.
+The route parser previously recognized only exact `C-1` and `MD` as rail,
+misclassified C-1a as a bus, and wrongly displayed services such as
+08:11 and 09:26 in Bus-only views.
+
+The parser now classifies `C-1 a` as `tren`. Because the CMTBC table
+provides only a general `L-V` academic-calendar label and no dated exact
+Renfe GTFS trip identity, each supplemental C-1a entry stays yellow with an
+explicit note: source is CMTBC, operating only on university teaching days,
+and **not confirmed for today's trip**. It is not eligible for individual
+Telegram train-check deep links or fabricated cancellation. This recurring
+caution is not forwarded as a new incident on every refresh.
+
+On the client, the currently selected service-day group determines whether
+a C-1a row duplicates an official dated C-1 GTFS row: same direction, origin
+and destination, and departure/arrival clocks within two minutes. In that
+case the official GTFS train is preferred. Unmatched C-1a remains visible
+under Train, never Bus. The Renfe strike headline is hidden when no train
+filter is selected. This is a **data source / filter correction**, not a
+change to chronological sorting.
+
+PWA deployment: the 15-minute updater only refreshes JSON. Changes to
+the client-side grouping must be patched in **both** installed shells with
+`deploy/patch-c1a-filter.py --apply` after tests and a guarded source
+fast-forward. The patch refuses unknown shell versions and preserves
+the existing root/PWA service-worker and installation details; it does
+not regenerate retired GitHub Pages `index.html`. Backup is kept under
+`/home/ubuntu/Backups/Transport/`.
+
 ## Large Renfe delays: station-specific and uncertain departures (5 November 2026)
 
 A Renfe delay is measured against the scheduled time **at the reported station**,
