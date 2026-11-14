@@ -104,6 +104,36 @@ class RenfeTrainScheduleTests(unittest.TestCase):
         self.assertEqual([row["trip_id"] for _,row in rows],
                          ["1300112026-10-01","1300312026-10-01"])
 
+    def test_regional_is_md_without_including_intercity(self):
+        idx=index()
+        idx["routes"]={"REGION":"REGIONAL","MDROUTE":"MD",
+                       "INTER":"INTERCITY","ALVIA":"ALVIA"}
+        idx["trips"]={}
+        base={"service":"WK","stops":[
+            {"stop_id":"51400","seq":1,
+             "arrival":"10:00:00","departure":"10:00:00"},
+            {"stop_id":"51300","seq":2,
+             "arrival":"10:09:00","departure":"10:10:00"},
+        ]}
+        # The official feed labels this same scheduled service MD one day
+        # and REGIONAL on another; both must render as MD.
+        idx["trips"]["1300112026-10-01"]={**base,"route":"REGION"}
+        idx["trips"]["3500112026-10-01"]={**base,"route":"REGION"}
+        idx["trips"]["1300212026-10-01"]={**base,"route":"INTER"}
+        idx["trips"]["1300312026-10-01"]={**base,"route":"ALVIA"}
+        other={**base,"route":"MDROUTE","stops":[
+            {"stop_id":"51400","seq":1,
+             "arrival":"11:00:00","departure":"11:00:00"},
+            {"stop_id":"51300","seq":2,
+             "arrival":"11:09:00","departure":"11:10:00"},
+        ]}
+        idx["trips"]["1300412026-10-01"]=other
+        rows=build_train_rows(idx,"MD",NOW.date(),"L-J")
+        self.assertEqual(len(rows),2)
+        self.assertEqual(
+            {r["trip_id"] for _,r in rows},
+            {"1300112026-10-01","1300412026-10-01"})
+
     def test_failure_marks_old_trains_unverified(self):
         data = {"puerto-cadiz": [
             {"linea": "C-1", "tipo": "tren", "salida": "08:40",

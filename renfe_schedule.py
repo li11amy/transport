@@ -37,8 +37,11 @@ def build_train_rows(index, code, day, group):
         if not service_active(index, trip_id, day):
             continue
         if code == "MD":
-            # This GTFS file is AV/LD/MD combined. Do not show ALVIA as MD.
-            if index.get("routes", {}).get(static["route"]) != "MD":
+            # Renfe's combined AV/LD file changes the route_short_name of the
+            # same regional services between "MD" and "REGIONAL" (Nov 2026).
+            # Both are Media Distancia; INTERCITY and ALVIA are not.
+            product = index.get("routes", {}).get(static["route"])
+            if product not in ("MD", "REGIONAL"):
                 continue
         stops = sorted(
             [s for s in static["stops"] if s["stop_id"] in by_id],

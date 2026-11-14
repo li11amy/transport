@@ -834,6 +834,19 @@ nightly monitoring process are introduced. Source changes may be
 deployed through the existing guarded `deploy/publish-radar-shadow.sh`
 after CI succeeds. Do not restart AVÍO or change any unrelated service.
 
+## Renfe MD renamed to REGIONAL in the GTFS feed (14 November 2026)
+
+The same six local Media Distancia routes inside the official combined
+`Fichero_AV_LD` archive have `routes.txt:route_short_name` equal to
+`MD` on 11 November but `REGIONAL` on 14 November. The former strict
+`== "MD"` check silently rejected every valid trip, triggering
+`no active trips for any of the four day groups` despite a successfully
+downloaded archive containing date-valid services. Accept **only** `MD`
+and `REGIONAL` as the regional product aliases. `INTERCITY` and `ALVIA`
+must remain excluded. The exact GTFS trip IDs, calendars, station stops
+and realtime cancellation checks remain unchanged, as does deduplication
+of multiple identities for the same departure.
+
 ## C-1a classification and duplicate weekday trains (11 November 2026)
 
 Consorcio publishes `C-1 a` as the Renfe C-1a university branch between
